@@ -4,7 +4,7 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**'] },
+  { ignores: ['dist/**', '.worktrees/**'] },
 
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -12,7 +12,6 @@ export default tseslint.config(
   // Backend GAS files
   {
     files: ['**/*.ts'],
-    ignores: ['.worktrees/**'],
     languageOptions: {
       sourceType: 'script', // no import/export — GAS files share one global scope
       parserOptions: {
