@@ -2,10 +2,10 @@
   "name": "gas-webapp",
   "version": "0.0.0",
   "private": true,
-  "description": "",
+  "description": "Single-entry-point router and middleware for Google Apps Script web apps.",
   "repository": {
     "type": "git",
-    "url": "url"
+    "url": "https://github.com/yorsh-co/gas-webapp.git"
   },
   "author": "Joshua Porter",
   "license": "MIT",
