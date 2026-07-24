@@ -44,6 +44,6 @@
     "format": "prettier . --write",
     "format:dist": "prettier ./dist --write",
     "format:check": "prettier . --check",
-    "check": "npm run format:check && npm run lint"
+    "check": "npm run format:check && npm run lint && npm run typecheck"
   }
 }
