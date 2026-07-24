@@ -49,6 +49,9 @@ const createLoggingMiddleware =
           status: (result as JsonResponse).payload?.status,
         },
       );
+
+      httpLogger.flush(); // for loggers using buffer
+
       return result;
     } catch (err) {
       // log error
@@ -59,8 +62,8 @@ const createLoggingMiddleware =
         },
       );
 
-      throw err;
-    } finally {
       httpLogger.flush(); // for loggers using buffer
+
+      throw err;
     }
   };
