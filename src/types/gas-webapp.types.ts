@@ -47,12 +47,4 @@ type WebAppResponse =
   | GoogleAppsScript.Content.TextOutput
   | SuccessPayload;
 
-class JsonResponse {
-  constructor(public readonly payload: SuccessPayload) {}
-}
-
-class HtmlResponse {
-  constructor(public readonly output: GoogleAppsScript.HTML.HtmlOutput) {}
-}
-
 type AppResponse = JsonResponse | HtmlResponse;
