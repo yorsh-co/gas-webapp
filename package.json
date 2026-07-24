@@ -1,0 +1,49 @@
+{
+  "name": "gas-webapp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "url"
+  },
+  "author": "Joshua Porter",
+  "license": "MIT",
+  "yorsh": {
+    "organization": "Yorsh",
+    "homepage": "https://yorsh.co"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module",
+  "prettier": {
+    "singleQuote": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/google-apps-script": "^2.0.11",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.6",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
+  },
+  "scripts": {
+    "clean": "rimraf dist",
+    "release": "bash scripts/release.sh",
+    "build": "npm run clean && tsc",
+    "build:format": "npm run check && npm run build && npm run format:dist",
+    "build:watch": "tsc --watch",
+    "build:release": "npm run build:format && npm run release",
+    "typecheck": "tsc --noEmit && echo '✓ TypeScript passed'",
+    "lint": "eslint . && echo '✓ Lint passed'",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:dist": "prettier ./dist --write",
+    "format:check": "prettier . --check",
+    "check": "npm run format:check && npm run lint"
+  }
+}
