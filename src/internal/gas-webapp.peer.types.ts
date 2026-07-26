@@ -16,9 +16,13 @@ declare class GasError extends Error {
 
 declare class NotFoundError extends GasError {}
 declare class ForbiddenError extends GasError {}
-declare class ValidationError extends GasError {}
+declare class ValidationError extends GasError {
+  constructor(message: string, details?: string);
+}
 declare class UnauthorizedError extends GasError {}
-declare class RateLimitError extends GasError {}
+declare class RateLimitError extends GasError {
+  constructor(message: string, retryAfterSeconds?: number);
+}
 
 interface ErrorHandlerContext {
   logger: GasLogger | typeof console;
