@@ -13,12 +13,15 @@ Routes and middleware are registered through `get`, `post`, and `use` methods on
 > **Disclaimer:**
 > This project and [Yorsh](https://github.com/yorsh-co) are independent and are not affiliated with, endorsed by, or associated with Google LLC.
 
+> **Browser client:**
+> A companion package wraps `google.script.run` calls for you — promises, timeouts, retry, and delivery acknowledgement instead of hand-rolled `withSuccessHandler`/`withFailureHandler` callbacks. It ships from this same repository on a separate `dist-web` branch. See [`web/README.md`](./web/README.md).
+
 ### Features
 
 - Single `doGet`/`doPost` entry point handling both real HTTP requests and `google.script.run` calls through the same route table
 - Express-style `get`/`post`/`use` API, including prefixed middleware and mountable sub-routers
 - Middleware chain composition, with global (`use(mw)`) or path-prefixed (`use('/api', mw)`) scoping
-- Built-in middleware factories: request logging, an injectable-policy auth check, and request rate/concurrency limiting
+- Built-in middleware factories: request logging, an injectable-policy auth check, request rate/concurrency limiting, and `google.script.run` delivery acknowledgement
 - Centralized error handling — thrown `GasError` subclasses are caught and serialized consistently instead of crashing the request
 - Response helpers (`json`, `render`) and template helpers (`include`, `js`, `css`, `html`) for `HtmlService`-based views, with configurable static asset directories/extensions
 - Written in TypeScript; ships compiled `.js` plus matching `.d.ts` files, so no build step is required to consume it, TS or not
@@ -327,6 +330,9 @@ google.script.run
   .doGet({ parameter: { route: '/api/users' } });
 ```
 
+> **Note:**
+> That's the raw shape either transport expects. If you'd rather not hand-roll the promise wrapping, retry, and error parsing yourself, the [browser client](./web/README.md) does this for you: `GasWebApp.api.get('/api/users')`.
+
 ### Add Middleware
 
 ```js
@@ -353,6 +359,41 @@ webApp.post(
   (request) => usersTable.insert(request.body),
 );
 ```
+
+> **Note:**
+> When `createRateLimiter` rejects a request for exceeding the window count, the `RateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
+
+### Delivery Acknowledgement
+
+`google.script.run` calls are occasionally dropped by the Apps Script bridge before they reach `doGet`/`doPost` at all — indistinguishable, from the client's side, from a request that's just slow. `createAckTracker` closes that gap: its middleware records a caller-supplied `callId` the moment a request enters the chain, and its handler reports back which of a set of `callId`s were recorded, using `CacheService` as short-lived storage.
+
+```js
+const ackTracker = createAckTracker(); // { ttlSeconds: 60 } by default
+
+// first — ahead of auth and rate limiting, so a request that arrives and is
+// then rejected (401, 429, etc.) is still acknowledged
+webApp.use(ackTracker.middleware);
+
+// outside any rate-limited prefix — this route is polled while other
+// requests are in flight, and would otherwise consume their rate budget
+webApp.get('/ack', ackTracker.handler);
+
+webApp.use('/api', createAuthMiddleware({ isAuthorized }));
+webApp.use(
+  '/api',
+  createRateLimiter({
+    limit: 100,
+    windowSeconds: 60,
+    lockScope: 'script',
+    keyFn: (request) => `route:${request.method}:${request.route}`,
+  }),
+);
+```
+
+`ackTracker.handler` expects a `callIds` parameter (comma-separated) and returns the subset that were found — each one is deleted from the cache as it's reported, so a given `callId` is only ever reported once.
+
+> **Note:**
+> `callId` is a correlation token, not a credential. It's never used for authorization, and because it's client-supplied it's validated against a UUID pattern before it's used as a cache key. Treat it as a hint that a request arrived, not proof of anything about who sent it.
 
 ### Mount a Sub-Router
 
