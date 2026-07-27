@@ -196,7 +196,7 @@ class GasWebApp extends GasWebAppRouter {
         logger: this._logger,
         method: request.method,
         path: request.route || '',
-        session: request.email || '',
+        sessionId: request.email || '',
       });
     }
   }

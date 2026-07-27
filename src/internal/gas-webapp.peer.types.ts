@@ -28,7 +28,8 @@ interface ErrorHandlerContext {
   logger: GasLogger | typeof console;
   method: string;
   path: string;
-  session: string;
+  sessionId?: string;
+  rethrow?: boolean;
 }
 
 declare function errorHandler(
