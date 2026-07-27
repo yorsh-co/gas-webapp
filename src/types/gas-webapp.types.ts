@@ -35,12 +35,6 @@ interface RenderOptions {
   [key: string]: unknown;
 }
 
-interface SuccessPayload {
-  ok: true;
-  status: number;
-  data: unknown;
-}
-
 /** Anything doGet/doPost can legally return across either transport. */
 type WebAppResponse =
   | GoogleAppsScript.HTML.HtmlOutput

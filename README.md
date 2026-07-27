@@ -13,6 +13,9 @@ Routes and middleware are registered through `get`, `post`, and `use` methods on
 > **Disclaimer:**
 > This project and [Yorsh](https://github.com/yorsh-co) are independent and are not affiliated with, endorsed by, or associated with Google LLC.
 
+> **Browser client:**
+> A companion package wraps `google.script.run` calls for you — promises, timeouts, retry, and delivery acknowledgement instead of hand-rolled `withSuccessHandler`/`withFailureHandler` callbacks. It ships from this same repository on a separate `dist-web` branch. See [`web/README.md`](./web/README.md).
+
 ### Features
 
 - Single `doGet`/`doPost` entry point handling both real HTTP requests and `google.script.run` calls through the same route table
@@ -327,6 +330,9 @@ google.script.run
   .doGet({ parameter: { route: '/api/users' } });
 ```
 
+> **Note:**
+> That's the raw shape either transport expects. If you'd rather not hand-roll the promise wrapping, retry, and error parsing yourself, the [browser client](./web/README.md) does this for you: `GasWebApp.api.get('/api/users')`.
+
 ### Add Middleware
 
 ```js
@@ -373,7 +379,15 @@ webApp.use(ackTracker.middleware);
 webApp.get('/ack', ackTracker.handler);
 
 webApp.use('/api', createAuthMiddleware({ isAuthorized }));
-webApp.use('/api', createRateLimiter({ limit: 100, windowSeconds: 60, lockScope: 'script', keyFn: (request) => `route:${request.method}:${request.route}` }));
+webApp.use(
+  '/api',
+  createRateLimiter({
+    limit: 100,
+    windowSeconds: 60,
+    lockScope: 'script',
+    keyFn: (request) => `route:${request.method}:${request.route}`,
+  }),
+);
 ```
 
 `ackTracker.handler` expects a `callIds` parameter (comma-separated) and returns the subset that were found — each one is deleted from the cache as it's reported, so a given `callId` is only ever reported once.
