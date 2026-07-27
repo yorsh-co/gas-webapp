@@ -118,7 +118,7 @@ rsync -a --delete \
 rsync -a --delete \
   --exclude '*.js' \
   "dist/shared/" "$WEB_DIR/shared/"
-cp web/README.md "$WEB_DIR/README.md"
+cp dist/web/README.md "$WEB_DIR/README.md"
 cp LICENSE.md CHANGELOG.md "$WEB_DIR/"
 
 echo "Committing and tagging dist-web..."

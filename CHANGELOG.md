@@ -20,5 +20,4 @@
 - `GasWebApp.api.get`/`.post` — promisified `google.script.run.doGet`/`doPost` wrappers with per-call timeouts and automatic retry on transient (`429`/`5xx`) failures
 - `GasWebApp.errors.ServerError`, parsing the router's error payload out of a failed `google.script.run` call so consumers can branch on `.status`/`.code` without re-parsing `Error.message`
 - Client-side delivery acknowledgement, pairing with the backend's `createAckTracker` to detect a `google.script.run` call that never reached the server and fail it distinctly, instead of waiting out the full timeout
-- `createRateLimiter` attaches `retryAfterSeconds` to the thrown `RateLimitError`'s `details` when a rate-limit (not a concurrency-limit) is exceeded, so callers can back off precisely instead of guessing
-- The browser client honors `details.retryAfterSeconds` when present, waiting at least that long before retrying a rate-limited call
+- `scripts/sync-gas-webapp.sh` — a standalone installer, distributed for consumers to download rather than reimplement, that installs or updates the backend, browser client, and `gas-error`/`gas-logger` peer dependencies together in one reviewable operation; each target is added if missing or pulled if already present, and `--backend-only` skips the browser client
