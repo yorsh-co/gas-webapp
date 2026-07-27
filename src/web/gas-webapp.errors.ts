@@ -92,6 +92,24 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
   }
 
   /**
+   * A synchronous failure that never reached `google.script.run` — a
+   * malformed request body, or the RPC call itself throwing (e.g. an
+   * oversized payload) — rather than a server response. Normalized to a
+   * `ServerError` so callers, and the retry loop in `gas-webapp.client.js`,
+   * can treat every rejection the same way via `.payload`.
+   */
+  function clientError(err: Error) {
+    const message = err && err.message ? err.message : String(err);
+    return new ServerError({
+      ok: false,
+      error: message || 'Request could not be sent',
+      status: 0,
+      code: 'CLIENT_ERROR',
+      details: message,
+    });
+  }
+
+  /**
    * Report a failed server call. Accepts either a `ServerError` or a raw error
    * off `withFailureHandler`, and returns the payload for the caller to act on.
    */
@@ -117,5 +135,6 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
     logServerError,
     timeoutError,
     notDeliveredError,
+    clientError,
   };
 })();
