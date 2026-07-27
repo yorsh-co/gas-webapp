@@ -12,6 +12,7 @@ export default tseslint.config(
   // Backend GAS files
   {
     files: ['**/*.ts'],
+    ignores: ['src/web/**'],
     languageOptions: {
       sourceType: 'script', // no import/export — GAS files share one global scope
       parserOptions: {
@@ -23,6 +24,22 @@ export default tseslint.config(
       // ESLint's no-undef doesn't see ambient .d.ts globals and will false-positive
       // on SpreadsheetApp, Logger, console, etc.
       // 'no-undef': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+
+  // Frontend (DOM lib, no GAS types).
+  {
+    files: ['src/web/**/*.ts'],
+    languageOptions: {
+      sourceType: 'script', // no import/export, shared window.App global
+      globals: globals.browser,
+      parserOptions: {
+        project: './tsconfig.frontend.json',
+      },
+    },
+    rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
     },
