@@ -43,12 +43,45 @@ interface GasWebAppOptions {
   logger?: GasWebAppLogger;
 }
 
+interface GasWebAppApi {
+  /** Dispatch a routed call. Resolves with the unwrapped `data` payload. */
+  request<T = unknown>(
+    method: ApiMethod,
+    route: string,
+    options?: ApiRequestOptions,
+  ): Promise<T>;
+  get<T = unknown>(route: string, options?: ApiRequestOptions): Promise<T>;
+  post<T = unknown>(
+    route: string,
+    body?: unknown,
+    options?: ApiRequestOptions,
+  ): Promise<T>;
+}
+
+interface GasWebAppErrors {
+  readonly CLIENT_TIMEOUT_CODE: string;
+  readonly NOT_DELIVERED_CODE: string;
+  ServerError: new (payload: GasErrorPayload) => IServerError;
+  parseServerError(err: Error): GasErrorPayload;
+  logServerError(err: Error, scope?: string): GasErrorPayload;
+  timeoutError(route: string, timeoutMs: number): IServerError;
+  notDeliveredError(route: string): IServerError;
+}
+
 interface GasWebAppNamespace {
   configure(options: GasWebAppOptions): void;
   /** @internal Resolved logger. Assign through `configure()`. */
   logger: GasWebAppLogger;
   api: GasWebAppApi;
   errors: GasWebAppErrors;
+}
+
+/** Minimal `google.script.run` surface used by the client. */
+interface GoogleScriptRun {
+  withSuccessHandler(callback: (value: unknown) => void): GoogleScriptRun;
+  withFailureHandler(callback: (error: unknown) => void): GoogleScriptRun;
+  doGet(e: SimulatedEvent): void;
+  doPost(e: SimulatedEvent): void;
 }
 
 interface Window {
