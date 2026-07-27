@@ -239,11 +239,21 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
           }),
         );
 
-      const event = buildEvent(method, route, options, callId);
-      if (method === 'POST') {
-        chained.doPost(event);
-      } else {
-        chained.doGet(event);
+      // buildEvent (JSON.stringify of the body) and the RPC dispatch below are
+      // synchronous and can throw before any handler above fires — a malformed
+      // body, or google.script.run itself rejecting an oversized payload. Left
+      // unguarded, that throw reaches request() as a plain Error with no
+      // `.payload`, crashing the retry logic instead of surfacing as a normal
+      // failed upload.
+      try {
+        const event = buildEvent(method, route, options, callId);
+        if (method === 'POST') {
+          chained.doPost(event);
+        } else {
+          chained.doGet(event);
+        }
+      } catch (err) {
+        settle(() => reject(window.GasWebApp.errors.clientError(err)));
       }
     });
   }

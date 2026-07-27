@@ -71,6 +71,7 @@ interface GasWebAppErrors {
   logServerError(err: Error, scope?: string): GasErrorPayload;
   timeoutError(route: string, timeoutMs: number): IServerError;
   notDeliveredError(route: string): IServerError;
+  clientError(err: unknown): IServerError;
 }
 
 interface GasWebAppNamespace {
