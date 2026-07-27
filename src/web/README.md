@@ -17,23 +17,14 @@ Ships from the same repository on a separate `dist-web` release branch, since `g
 
 ### Requirements
 
-This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together.
+This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together — `scripts/sync-gas-webapp.sh` does this by default, pulling both branches at the same ref unless you override them separately.
 
 ## Add the library to your Apps Script project
 
-This repository publishes the browser client on its own `dist-web` branch, separate from the backend's `dist`. Most projects need both — see the [backend README](../README.md#quick-start) for the `dist` subtree command. The two are independent `git subtree` operations; if your project scripts them together, keep that script on the consuming side, since the exact prefixes are yours to choose.
-
-```bash
-git subtree add \
-  --prefix=src/web/public/js/lib/gas-webapp \
-  https://github.com/yorsh-co/gas-webapp.git \
-  dist-web \
-  --squash
-```
-
-This creates:
+Installed together with the backend (and `gas-error`/`gas-logger`) via `scripts/sync-gas-webapp.sh` — see the [backend README's Quick Start](../README.md#quick-start) for the download-and-run command. Running it without `--backend-only` adds this package too:
 
 ```txt
+src/lib/gas-webapp/
 src/web/public/js/lib/gas-webapp/
 ```
 
@@ -42,14 +33,6 @@ Unlike the backend package, this one ships as TypeScript source rather than comp
 ## Load Order
 
 Load these three files, in this order, before anything that calls `configure()` or uses `GasWebApp.api`:
-
-```html
-<script src="gas-webapp.config.js"></script>
-<script src="gas-webapp.errors.js"></script>
-<script src="gas-webapp.client.js"></script>
-```
-
-Or, from inside an `HtmlService` template served by the paired `gas-webapp` backend:
 
 ```html
 <?!= webApp.js('/lib/gas-webapp/gas-webapp.config'); ?>
@@ -72,6 +55,17 @@ window.GasWebApp.configure({
 ```
 
 Optional. Without it, the client logs its own warnings and errors to `console`.
+
+> **Note:**
+> If your project keeps its own `window.App`-style namespace and wants `App.api`/`App.errors` to resolve here, alias them once at boot, after this package's scripts load:
+>
+> ```js
+> window.GasWebApp.configure({ logger: window.App.log });
+> window.App.api = window.GasWebApp.api;
+> window.App.errors = window.GasWebApp.errors;
+> ```
+>
+> This is a convention your project chooses, not something `gas-webapp` requires — page code can equally call `window.GasWebApp.api.get(...)` directly, with no aliasing at all.
 
 ## Usage
 

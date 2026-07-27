@@ -95,53 +95,45 @@ If using `createAuthMiddleware`, the deployment's **Execute as** setting must re
 
 It is recommended to use `gas-webapp` together with [Google's `clasp` CLI](https://github.com/google/clasp) for local Apps Script development and git-based workflows. See [Setup instructions with `clasp`](#setup-instructions-with-clasp) for more information.
 
-#### 1. Add the library to your Apps Script project
+#### 1. Add the library and its peer dependencies
 
-This repository publishes compiled output on a dedicated `dist` branch — subtree from `dist`, not `main`, so no TypeScript/ESLint tooling lands in your project.
+This repository publishes compiled output on two branches — `dist` (backend) and `dist-web` (browser client) — since `git subtree` imports a branch root and has no way to select a subdirectory. `gas-error` (required) and `gas-logger` (optional) are separate repos again. `scripts/sync-gas-webapp.sh` adds all of it in one step; download it once and run it from your project root:
 
 ```bash
-git subtree add \
-  --prefix=src/lib/gas-webapp \
-  https://github.com/yorsh-co/gas-webapp.git \
-  dist \
-  --squash
+curl -o scripts/sync-gas-webapp.sh \
+    https://raw.githubusercontent.com/yorsh-co/gas-webapp/main/scripts/sync-gas-webapp.sh \
+    && chmod +x scripts/sync-gas-webapp.sh \
+    && scripts/sync-gas-webapp.sh
 ```
 
 This creates:
 
 ```txt
 src/lib/gas-webapp/
+src/web/public/js/lib/gas-webapp/
+src/lib/gas-error/
+src/lib/gas-logger/
 ```
 
-#### 2. Add its peer dependencies
+Keep the downloaded script — running it again later pulls updates for whatever's already present, no separate command to remember. See [Peer Dependencies](#peer-dependencies) for what each of these is for.
 
-```bash
-git subtree add \
-  --prefix=src/lib/gas-error \
-  https://github.com/yorsh-co/gas-error.git \
-  dist \
-  --squash
+> **Note:**
+> Only need the backend, with no browser client? `scripts/sync-gas-webapp.sh --backend-only` skips the browser client and still brings in `gas-error`/`gas-logger`. Only need `gas-webapp` itself, with none of this? `git subtree add --prefix=src/lib/gas-webapp https://github.com/yorsh-co/gas-webapp.git dist --squash` works standalone.
 
-git subtree add \
-  --prefix=src/lib/gas-logger \
-  https://github.com/yorsh-co/gas-logger.git \
-  dist \
-  --squash
-```
-
-See [Peer Dependencies](#peer-dependencies) for which of these are required.
-
-#### 3. Configure Apps Script deployment
+#### 2. Configure Apps Script deployment
 
 Add the `webapp` execution config to the parent project's `appsscript.json`.
 
 See the [Deployment](#deployment) section above.
 
-#### 4. If needed, move `gas-webapp` files to the start of the execution order
+#### 3. If needed, move `gas-webapp` files to the start of the execution order
 
 `GasWebApp` extends `GasWebAppRouter`, so the router's file must execute before the class that extends it. See the [Configure the file push order](#6-configure-the-file-push-order) section for details.
 
-#### 5. Declare a `GasWebApp` instance and export its entry points
+> **Note:**
+> Using the browser client too? It has its own script-load-order requirement — enforced by `<script>` tag order, a separate concern from `clasp push`'s file push order. See [web/README.md](./web/README.md#load-order).
+
+#### 4. Declare a `GasWebApp` instance and export its entry points
 
 ```js
 const webApp = new GasWebApp();
@@ -186,30 +178,20 @@ clasp create --type webapp
 
 #### 5. Import `gas-webapp` and its peer dependencies
 
+`gas-webapp` ships as two subtrees — backend and browser client — and pulls in `gas-error`/`gas-logger` alongside them, all via `scripts/sync-gas-webapp.sh`. Download it once and run it from your project root:
+
 ```bash
-git subtree add \
-  --prefix=src/lib/gas-webapp \
-  https://github.com/yorsh-co/gas-webapp.git \
-  dist \
-  --squash
-
-git subtree add \
-  --prefix=src/lib/gas-error \
-  https://github.com/yorsh-co/gas-error.git \
-  dist \
-  --squash
-
-git subtree add \
-  --prefix=src/lib/gas-logger \
-  https://github.com/yorsh-co/gas-logger.git \
-  dist \
-  --squash
+curl -o scripts/sync-gas-webapp.sh \
+    https://raw.githubusercontent.com/yorsh-co/gas-webapp/main/scripts/sync-gas-webapp.sh \
+    && chmod +x scripts/sync-gas-webapp.sh \
+    && scripts/sync-gas-webapp.sh
 ```
 
 This creates:
 
 ```txt
 src/lib/gas-webapp/
+src/web/public/js/lib/gas-webapp/
 src/lib/gas-error/
 src/lib/gas-logger/
 ```
@@ -235,6 +217,7 @@ Add a [`filePushOrder`](https://github.com/google/clasp#filepushorder-optional) 
     "dist/lib/gas-error/module/gas-error.class.js",
     "dist/lib/gas-error/module/gas-error.handler.js",
 
+    "dist/lib/gas-webapp/gas-webapp.response.js",
     "dist/lib/gas-webapp/module/gas-webapp.router.class.js",
     "dist/lib/gas-webapp/module/gas-webapp.constants.js",
     "dist/lib/gas-webapp/module/gas-webapp.class.js"
@@ -246,6 +229,9 @@ Alternatively, you can manually move these files to the top of the file list in 
 
 > **Note:**
 > Middleware factories (`createLoggingMiddleware`, `createAuthMiddleware`, `createRateLimiter`, `createConcurrencyLimiter`) are only referenced inside function bodies, not at file top level, so they have no ordering requirement relative to each other. Any file in your own project that constructs a `GasWebApp` instance (e.g. `const webApp = new GasWebApp()`) must still be pushed _after_ the entries above.
+
+> **Note:**
+> This ordering is specific to Apps Script's `clasp push`. The browser client has its own, separate load-order requirement enforced by `<script>` tag order — see [web/README.md](./web/README.md#load-order).
 
 #### 7. Push local files to Apps Script
 
