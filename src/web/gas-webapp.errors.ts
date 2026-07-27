@@ -16,6 +16,7 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
   'use strict';
 
   const CLIENT_TIMEOUT_CODE = 'CLIENT_TIMEOUT';
+  const NOT_DELIVERED_CODE = 'NOT_DELIVERED';
 
   /** Fallback for anything that isn't a recoverable server payload. */
   function defaultErrorPayload(message: string): GasErrorPayload {
@@ -77,6 +78,20 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
   }
 
   /**
+   * The call was never acknowledged, so it most likely never arrived. 503 keeps
+   * it inside the retryable set.
+   */
+  function notDeliveredError(route: string): IServerError {
+    return new ServerError({
+      ok: false,
+      error: 'Request never reached the server',
+      status: 503,
+      code: NOT_DELIVERED_CODE,
+      details: { route },
+    });
+  }
+
+  /**
    * Report a failed server call. Accepts either a `ServerError` or a raw error
    * off `withFailureHandler`, and returns the payload for the caller to act on.
    */
@@ -96,6 +111,7 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
 
   window.GasWebApp.errors = {
     CLIENT_TIMEOUT_CODE,
+    NOT_DELIVERED_CODE,
     ServerError,
     parseServerError,
     logServerError,

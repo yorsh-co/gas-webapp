@@ -16,6 +16,11 @@ interface ApiRequestOptions {
   timeoutMs?: number;
   /** Retries after the first attempt. @default 2 for GET, 0 for POST */
   retries?: number;
+  /**
+   * Watch for delivery confirmation before deciding a silent call failed.
+   * Only the ack poll itself sets this to `false`. @default true
+   */
+  ack?: boolean;
   /** Logger scope for failures. @default `${method} ${route}` */
   scope?: string;
 }

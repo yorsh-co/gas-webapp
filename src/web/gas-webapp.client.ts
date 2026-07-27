@@ -34,6 +34,14 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
   const MAX_RETRY_DELAY_MS = 15000;
   const RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
 
+  /** Top-level route, deliberately outside the `/api/v1` limiter chain. */
+  const ACK_ROUTE = '/ack';
+  const ACK_POLL_INTERVAL_MS = 2000;
+  const ACK_POLL_TIMEOUT_MS = 5000;
+  /** How long a call may go unacknowledged before it counts as undelivered. */
+  const ACK_DEADLINE_MS = 8000;
+  const ACK_SCOPE = 'Ack Watcher';
+
   function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -86,6 +94,84 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     }
 
     return event;
+  }
+
+  // =========================
+  // ACK WATCHER
+  // =========================
+
+  interface AckWaiter {
+    deadline: number;
+    resolve: (arrived: boolean) => void;
+  }
+
+  const ackWaiters = new Map<string, AckWaiter>();
+  let ackTimer: ReturnType<typeof setTimeout> | null = null;
+  let ackPolling = false;
+
+  /**
+   * Resolves `true` once the server confirms it received `callId`, or `false`
+   * once the ack deadline passes. All outstanding ids ride a single poll, so
+   * concurrent requests cost one call per interval rather than one each.
+   */
+  function watchAck(callId: string): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      ackWaiters.set(callId, {
+        deadline: Date.now() + ACK_DEADLINE_MS,
+        resolve,
+      });
+      scheduleAckPoll();
+    });
+  }
+
+  function cancelAck(callId: string): void {
+    ackWaiters.delete(callId);
+  }
+
+  function settleAck(callId: string, arrived: boolean): void {
+    const waiter = ackWaiters.get(callId);
+    if (!waiter) return;
+    ackWaiters.delete(callId);
+    waiter.resolve(arrived);
+  }
+
+  function scheduleAckPoll(): void {
+    if (ackTimer !== null || ackPolling || ackWaiters.size === 0) return;
+    ackTimer = setTimeout(pollAcks, ACK_POLL_INTERVAL_MS);
+  }
+
+  async function pollAcks(): Promise<void> {
+    ackTimer = null;
+    ackPolling = true;
+
+    try {
+      const callIds = Array.from(ackWaiters.keys());
+      if (callIds.length === 0) return;
+
+      try {
+        const arrived = await request<string[]>('GET', ACK_ROUTE, {
+          params: { callIds: callIds.join(',') },
+          ack: false,
+          retries: 0,
+          timeoutMs: ACK_POLL_TIMEOUT_MS,
+        });
+        arrived.forEach((callId) => settleAck(callId, true));
+      } catch {
+        // A failed poll is not evidence of a failed request. Say nothing and
+        // let the deadline decide.
+        window.GasWebApp.logger.debug(ACK_SCOPE, 'Poll failed', {
+          pending: callIds.length,
+        });
+      }
+
+      const now = Date.now();
+      Array.from(ackWaiters.entries()).forEach(([callId, waiter]) => {
+        if (now >= waiter.deadline) settleAck(callId, false);
+      });
+    } finally {
+      ackPolling = false;
+      scheduleAckPoll();
+    }
   }
 
   // =========================
