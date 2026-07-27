@@ -63,8 +63,11 @@ for arg in "$@"; do
   esac
 done
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo "error: working tree is not clean — refusing to run" >&2
+# --untracked-files=no is deliberate: right after downloading this script,
+# it's an untracked file in the repo it's about to run in. Only uncommitted
+# changes to tracked files are worth blocking on.
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "error: uncommitted changes — refusing to run" >&2
   exit 1
 fi
 
@@ -130,3 +133,9 @@ git branch -d "$WORK"
 
 echo "✓ done:"
 printf '  %s\n' "${SUMMARY[@]}"
+
+if git status --porcelain --untracked-files=normal -- "$0" 2>/dev/null | grep -q '^??'; then
+  echo ""
+  echo "Note: $0 itself isn't committed yet — worth adding so it's" \
+       "there next time and for anyone else on the project."
+fi
