@@ -1,4 +1,4 @@
-const RATE_LIMITER_LOCK_TIMEOUT_MS = 5000;
+const RATE_LIMITER_LOCK_TIMEOUT_MS = 10000;
 
 /**
  * Used when a limiter isn't given a lockService — resolves LockService
@@ -38,7 +38,7 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
       const lock = lockService.getLock(config.lockScope);
       if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
         throw new RateLimitError(
-          'Rate limiter busy — try again',
+          'Too many requests — try again',
           retryAfterSeconds,
         );
       }
@@ -53,7 +53,7 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
 
       if (count > config.limit) {
         throw new RateLimitError(
-          `Rate limit exceeded (${config.limit}/${config.windowSeconds}s)`,
+          `Too many requests (${config.limit}/${config.windowSeconds}s)`,
           retryAfterSeconds,
         );
       }
