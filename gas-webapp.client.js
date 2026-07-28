@@ -37,7 +37,7 @@ window.GasWebApp.api = window.GasWebApp.api || {};
   const ACK_POLL_INTERVAL_MS = 2000;
   const ACK_POLL_TIMEOUT_MS = 5000;
   /** How long a call may go unacknowledged before it counts as undelivered. */
-  const ACK_DEADLINE_MS = 8000;
+  const ACK_DEADLINE_MS = 20000;
   const ACK_SCOPE = 'Ack Watcher';
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
