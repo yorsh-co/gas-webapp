@@ -21,7 +21,7 @@ Routes and middleware are registered through `get`, `post`, and `use` methods on
 - Single `doGet`/`doPost` entry point handling both real HTTP requests and `google.script.run` calls through the same route table
 - Express-style `get`/`post`/`use` API, including prefixed middleware and mountable sub-routers
 - Middleware chain composition, with global (`use(mw)`) or path-prefixed (`use('/api', mw)`) scoping
-- Built-in middleware factories: request logging, an injectable-policy auth check, request rate/concurrency limiting, and `google.script.run` delivery acknowledgement
+- Built-in middleware factories: request logging, an injectable-policy auth check, request rate/concurrency limiting with a configurable lock scope and optional injected lock service, and `google.script.run` delivery acknowledgement
 - Centralized error handling — thrown `GasError` subclasses are caught and serialized consistently instead of crashing the request
 - Response helpers (`json`, `render`) and template helpers (`include`, `js`, `css`, `html`) for `HtmlService`-based views, with configurable static asset directories/extensions
 - Written in TypeScript; ships compiled `.js` plus matching `.d.ts` files, so no build step is required to consume it, TS or not
@@ -65,10 +65,11 @@ const doPost = webApp.doPost;
 
 `gas-webapp` expects the following as globals at runtime — both are separate subtree packages, added the same way as `gas-webapp` itself.
 
-| Package                                                | Required | Used for                                                                                                    |
-| ------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
-| [`gas-error`](https://github.com/yorsh-co/gas-error)   | Yes      | `NotFoundError`, `ForbiddenError`, `ValidationError`, `UnauthorizedError`, `RateLimitError`, `errorHandler` |
-| [`gas-logger`](https://github.com/yorsh-co/gas-logger) | No       | Structured request logging via `createLoggingMiddleware`; falls back to `console` if omitted                |
+| Package                                                | Required | Used for                                                                                                                   |
+| ------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [`gas-error`](https://github.com/yorsh-co/gas-error)   | Yes      | `NotFoundError`, `ForbiddenError`, `ValidationError`, `UnauthorizedError`, `RateLimitError`, `errorHandler`                |
+| [`gas-logger`](https://github.com/yorsh-co/gas-logger) | No       | Structured request logging via `createLoggingMiddleware`; falls back to `console` if omitted                               |
+| [`gas-lock`](https://github.com/yorsh-co/gas-lock)     | No       | Optional `lockService` for `createRateLimiter`/`createConcurrencyLimiter`; falls back to `LockService` directly if omitted |
 
 ### Deployment
 
@@ -348,6 +349,28 @@ webApp.post(
 
 > **Note:**
 > When `createRateLimiter` rejects a request for exceeding the window count, the `RateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
+
+### Sharing a lock registry
+
+Both limiters take an optional `lockService` — anything exposing `getLock(scope)`:
+
+```js
+webApp.use(
+  '/api',
+  createRateLimiter({
+    limit: 100,
+    windowSeconds: 60,
+    lockScope: 'script',
+    lockService: GasLock,
+    keyFn: (request) => `route:${request.method}:${request.route}`,
+  }),
+);
+```
+
+Omitted, both resolve `LockService.getScriptLock()`/`getUserLock()` directly — unchanged behavior. Pass [`gas-lock`](https://github.com/yorsh-co/gas-lock) when other services in the same execution (e.g. [`gas-sheetdb`](https://github.com/yorsh-co/gas-sheetdb)) also lock, so every layer resolves through one registry.
+
+> **Note:**
+> The limiters use non-blocking `tryLock`, so they fail fast on contention rather than deadlocking — injecting `gas-lock` here is about consistency with the rest of the app's locking, not about fixing a hang. `gas-lock`'s `getLock` is not reentrancy-tracked, since reentrancy only means anything for its callback-scoped `withLock`.
 
 ### Delivery Acknowledgement
 
