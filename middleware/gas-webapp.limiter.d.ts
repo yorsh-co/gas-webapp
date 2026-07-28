@@ -1,4 +1,4 @@
-declare const RATE_LIMITER_LOCK_TIMEOUT_MS = 5000;
+declare const RATE_LIMITER_LOCK_TIMEOUT_MS = 10000;
 /**
  * Used when a limiter isn't given a lockService — resolves LockService
  * directly, reproducing the limiters' original inline behavior exactly.

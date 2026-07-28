@@ -218,6 +218,9 @@ Add a [`filePushOrder`](https://github.com/google/clasp#filepushorder-optional) 
     "dist/lib/gas-error/module/gas-error.class.js",
     "dist/lib/gas-error/module/gas-error.handler.js",
 
+    "dist/lib/gas-lock/gas-lock.constants.js",
+    "dist/lib/gas-lock/gas-lock.js",
+
     "dist/lib/gas-webapp/gas-webapp.response.js",
     "dist/lib/gas-webapp/module/gas-webapp.router.class.js",
     "dist/lib/gas-webapp/module/gas-webapp.constants.js",
