@@ -26,29 +26,21 @@ window.GasWebApp = window.GasWebApp || {};
 window.GasWebApp.api = window.GasWebApp.api || {};
 (function (api) {
   'use strict';
-  const DEFAULT_TIMEOUT_MS = 30000;
-  const DEFAULT_GET_RETRIES = 2;
-  const RETRY_BASE_MS = 400;
-  /** Beyond this, waiting costs more than failing — the retry is abandoned. */
-  const MAX_RETRY_DELAY_MS = 15000;
-  const RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
-  /** Top-level route, deliberately outside the `/api/v1` limiter chain. */
-  const ACK_ROUTE = '/ack';
-  const ACK_POLL_INTERVAL_MS = 2000;
-  const ACK_POLL_TIMEOUT_MS = 5000;
-  /** How long a call may go unacknowledged before it counts as undelivered. */
-  const ACK_DEADLINE_MS = 8000;
-  const ACK_SCOPE = 'Ack Watcher';
+  /**
+   * Read per call, never captured: `configure()` runs after this file loads,
+   * and mutates the same object in place.
+   */
+  const config = () => window.GasWebApp.config;
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
   /** Exponential backoff, jittered across the upper half of each window. */
   function backoffMs(attempt) {
-    const ceiling = RETRY_BASE_MS * Math.pow(2, attempt);
+    const ceiling = config().retryBaseMs * Math.pow(2, attempt);
     return ceiling / 2 + Math.random() * (ceiling / 2);
   }
   function isRetryable(payload) {
-    return RETRYABLE_STATUSES.indexOf(payload.status) !== -1;
+    return config().retryableStatuses.indexOf(payload.status) !== -1;
   }
   /**
    * Honor `details.retryAfterSeconds` when the server supplies it (rate
@@ -89,7 +81,7 @@ window.GasWebApp.api = window.GasWebApp.api || {};
   function watchAck(callId) {
     return new Promise((resolve) => {
       ackWaiters.set(callId, {
-        deadline: Date.now() + ACK_DEADLINE_MS,
+        deadline: Date.now() + config().ackDeadlineMs,
         resolve,
       });
       scheduleAckPoll();
@@ -106,26 +98,27 @@ window.GasWebApp.api = window.GasWebApp.api || {};
   }
   function scheduleAckPoll() {
     if (ackTimer !== null || ackPolling || ackWaiters.size === 0) return;
-    ackTimer = setTimeout(pollAcks, ACK_POLL_INTERVAL_MS);
+    ackTimer = setTimeout(pollAcks, config().ackPollIntervalMs);
   }
   async function pollAcks() {
     ackTimer = null;
     ackPolling = true;
+    const { ackRoute, ackPollTimeoutMs, ackScope } = config();
     try {
       const callIds = Array.from(ackWaiters.keys());
       if (callIds.length === 0) return;
       try {
-        const arrived = await request('GET', ACK_ROUTE, {
+        const arrived = await request('GET', ackRoute, {
           params: { callIds: callIds.join(',') },
           ack: false,
           retries: 0,
-          timeoutMs: ACK_POLL_TIMEOUT_MS,
+          timeoutMs: ackPollTimeoutMs,
         });
         arrived.forEach((callId) => settleAck(callId, true));
       } catch {
         // A failed poll is not evidence of a failed request. Say nothing and
         // let the deadline decide.
-        window.GasWebApp.logger.debug(ACK_SCOPE, 'Poll failed', {
+        window.GasWebApp.logger.debug(ackScope, 'Poll failed', {
           pending: callIds.length,
         });
       }
@@ -163,7 +156,7 @@ window.GasWebApp.api = window.GasWebApp.api || {};
         );
         return;
       }
-      const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const timeoutMs = options.timeoutMs ?? config().timeoutMs;
       let settled = false;
       function settle(fn) {
         if (settled) return;
@@ -242,7 +235,7 @@ window.GasWebApp.api = window.GasWebApp.api || {};
   async function request(method, route, options = {}) {
     const scope = options.scope ?? `${method} ${route}`;
     const retries =
-      options.retries ?? (method === 'GET' ? DEFAULT_GET_RETRIES : 0);
+      options.retries ?? (method === 'GET' ? config().getRetries : 0);
     for (let attemptIndex = 0; ; attemptIndex += 1) {
       try {
         return await attempt(method, route, options);
@@ -252,7 +245,7 @@ window.GasWebApp.api = window.GasWebApp.api || {};
         if (
           attemptIndex >= retries ||
           !isRetryable(error.payload) ||
-          delay > MAX_RETRY_DELAY_MS
+          delay > config().maxRetryDelayMs
         ) {
           window.GasWebApp.errors.logServerError(error, scope);
           throw error;
