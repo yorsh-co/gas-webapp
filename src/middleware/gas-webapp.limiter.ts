@@ -1,11 +1,26 @@
 const RATE_LIMITER_LOCK_TIMEOUT_MS = 5000;
 
 /**
+ * Used when a limiter isn't given a lockService — resolves LockService
+ * directly, reproducing the limiters' original inline behavior exactly.
+ * Pass GasLock to share one lock registry with the rest of the app.
+ */
+const GAS_WEBAPP_DEFAULT_LOCK_SERVICE: GasWebAppLockService = Object.freeze({
+  getLock(scope: LockScope): GoogleAppsScript.Lock.Lock | null {
+    return scope === 'user'
+      ? LockService.getUserLock()
+      : LockService.getScriptLock();
+  },
+});
+
+/**
  * Fixed-window counter backed by CacheService. The window boundary is
  * baked into the cache key, so expiry happens for free via CacheService's
  * TTL — no separate cleanup job needed.
  */
 const createRateLimiter = (config: RateLimitConfig): Middleware => {
+  const lockService = config.lockService ?? GAS_WEBAPP_DEFAULT_LOCK_SERVICE;
+
   return (next: Handler): Handler =>
     (request: RouteRequest) => {
       const cache = CacheService.getScriptCache();
@@ -20,11 +35,8 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
         Math.ceil((windowEndMs - Date.now()) / 1000),
       );
 
-      const lock =
-        config.lockScope === 'user'
-          ? LockService.getUserLock()
-          : LockService.getScriptLock();
-      if (!lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
+      const lock = lockService.getLock(config.lockScope);
+      if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
         throw new RateLimitError(
           'Rate limiter busy — try again',
           retryAfterSeconds,
@@ -62,7 +74,7 @@ const createConcurrencyLimiter = (
     lock: GoogleAppsScript.Lock.Lock,
     delta: number,
   ): number => {
-    if (!lock.tryLock(3000)) {
+    if (!lock || !lock.tryLock(3000)) {
       if (delta > 0) throw new RateLimitError('Concurrency limiter busy');
       return -1; // best-effort release on contention — don't fail the response for this
     }
