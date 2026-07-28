@@ -30,7 +30,7 @@ window.GasWebApp = window.GasWebApp || {};
     ackRoute: '/ack',
     ackPollIntervalMs: 2000,
     ackPollTimeoutMs: 5000,
-    ackDeadlineMs: 8000,
+    ackDeadlineMs: 15000,
     ackScope: 'Ack Watcher',
   };
   window.GasWebApp.logger = consoleLogger;
