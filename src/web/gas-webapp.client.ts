@@ -37,10 +37,6 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   /** Exponential backoff, jittered across the upper half of each window. */
   function backoffMs(attempt: number): number {
     const ceiling = config().retryBaseMs * Math.pow(2, attempt);
@@ -139,8 +135,7 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     ackTimer = null;
     ackPolling = true;
 
-        const { ackRoute, ackPollTimeoutMs, ackScope } = config();
-
+    const { ackRoute, ackPollTimeoutMs, ackScope } = config();
 
     try {
       const callIds = Array.from(ackWaiters.keys());
