@@ -51,21 +51,27 @@ Each file uses the `window.GasWebApp = window.GasWebApp || (...)` idiom and only
 ```js
 window.GasWebApp.configure({
   logger: window.App.log, // any object with debug/info/warn/error(scope, message, context?)
+  ackRoute: '/ack', // must match where the backend mounts ack.handler
 });
 ```
 
-Optional. Without it, the client logs its own warnings and errors to `console`.
+Optional, and every field is. Without it, the client logs its own warnings and errors to `console` and runs on the defaults below.
 
-> **Note:**
-> If your project keeps its own `window.App`-style namespace and wants `App.api`/`App.errors` to resolve here, alias them once at boot, after this package's scripts load:
->
-> ```js
-> window.GasWebApp.configure({ logger: window.App.log });
-> window.App.api = window.GasWebApp.api;
-> window.App.errors = window.GasWebApp.errors;
-> ```
->
-> This is a convention your project chooses, not something `gas-webapp` requires — page code can equally call `window.GasWebApp.api.get(...)` directly, with no aliasing at all.
+| Option              | Default                     | Purpose                                                |
+| ------------------- | --------------------------- | ------------------------------------------------------ |
+| `logger`            | `console` (warn and above)  | Where the client sends its own diagnostics             |
+| `timeoutMs`         | `30000`                     | Per-call deadline, unless overridden per request       |
+| `getRetries`        | `2`                         | Retries after the first attempt; GET only              |
+| `retryBaseMs`       | `400`                       | First backoff window; doubles each attempt             |
+| `maxRetryDelayMs`   | `15000`                     | Past this, the retry is abandoned                      |
+| `retryableStatuses` | `[429, 500, 502, 503, 504]` | Statuses worth a second attempt                        |
+| `ackRoute`          | `'/ack'`                    | Where the backend mounts `ack.handler`                 |
+| `ackPollIntervalMs` | `2000`                      | Gap between ack polls                                  |
+| `ackPollTimeoutMs`  | `5000`                      | Deadline for the ack poll itself                       |
+| `ackDeadlineMs`     | `8000`                      | Unacknowledged past this, a call counts as undelivered |
+| `ackScope`          | `'Ack Watcher'`             | Logger scope for ack diagnostics                       |
+
+Call it once at boot. Values are read live on each request, so it only has to run before the first call.
 
 ## Usage
 
