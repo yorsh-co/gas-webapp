@@ -33,7 +33,7 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
     ackRoute: '/ack',
     ackPollIntervalMs: 2000,
     ackPollTimeoutMs: 5000,
-    ackDeadlineMs: 8000,
+    ackDeadlineMs: 15000,
     ackScope: 'Ack Watcher',
   };
 
