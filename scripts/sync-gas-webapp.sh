@@ -27,7 +27,7 @@
 #
 # --backend-only skips the browser client entirely — for a project using
 # gas-webapp purely as a server-side API. Peer dependencies are unaffected:
-# gas-error and gas-logger are backend dependencies regardless.
+# gas-error, gas-logger and gas-lock are backend dependencies regardless.
 #
 # Every prefix, ref, and remote defaults to this project's own conventions
 # and can be overridden without editing the script:
@@ -43,6 +43,9 @@
 #   GAS_LOGGER_PREFIX=src/lib/gas-logger
 #   GAS_LOGGER_REF=dist
 #   GAS_LOGGER_REMOTE=https://github.com/yorsh-co/gas-logger.git
+#   GAS_LOCK_PREFIX=src/lib/gas-lock
+#   GAS_LOCK_REF=dist
+#   GAS_LOCK_REMOTE=https://github.com/yorsh-co/gas-lock.git
 #
 #   GAS_WEBAPP_BACKEND_REF=dist-v0.2.0 GAS_WEBAPP_FRONTEND_REF=web-v0.2.0 \
 #     scripts/sync-gas-webapp.sh
@@ -120,6 +123,11 @@ sync_target "gas-logger" \
   "${GAS_LOGGER_PREFIX:-src/lib/gas-logger}" \
   "${GAS_LOGGER_REMOTE:-https://github.com/yorsh-co/gas-logger.git}" \
   "${GAS_LOGGER_REF:-dist}"
+
+  sync_target "gas-lock" \
+  "${GAS_LOCK_PREFIX:-src/lib/gas-lock}" \
+  "${GAS_LOCK_REMOTE:-https://github.com/yorsh-co/gas-lock.git}" \
+  "${GAS_LOCK_REF:-dist}"
 
 git checkout --quiet "$BASE"
 git merge --no-ff --no-edit \
