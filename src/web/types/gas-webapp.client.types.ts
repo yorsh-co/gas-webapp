@@ -43,7 +43,44 @@ interface GasWebAppLogger {
   error(scope: string, message: string, context?: unknown): void;
 }
 
-interface GasWebAppOptions {
+/**
+ * Client tunables. Every field has a default; override any subset through
+ * `configure()`. Read live on each call, so `configure()` may run at any point
+ * before the first request.
+ */
+interface GasWebAppClientConfig {
+  /** Client-side deadline per call, unless overridden. @default 30000 */
+  timeoutMs: number;
+  /** Retries after the first attempt, GET only. @default 2 */
+  getRetries: number;
+  /** First backoff window; doubles each attempt. @default 400 */
+  retryBaseMs: number;
+  /**
+   * Beyond this, waiting costs more than failing — the retry is abandoned.
+   * @default 15000
+   */
+  maxRetryDelayMs: number;
+  /** Statuses worth a second attempt. @default [429, 500, 502, 503, 504] */
+  retryableStatuses: number[];
+  /**
+   * Where the server mounts `ack.handler`. Must match the backend, and should
+   * stay outside any limiter chain. @default '/ack'
+   */
+  ackRoute: string;
+  /** Gap between ack polls. @default 2000 */
+  ackPollIntervalMs: number;
+  /** Deadline for the ack poll itself. @default 5000 */
+  ackPollTimeoutMs: number;
+  /**
+   * How long a call may go unacknowledged before it counts as undelivered.
+   * @default 8000
+   */
+  ackDeadlineMs: number;
+  /** Logger scope for ack-watcher diagnostics. @default 'Ack Watcher' */
+  ackScope: string;
+}
+
+interface GasWebAppOptions extends Partial<GasWebAppClientConfig> {
   /** Where the client sends its own diagnostics. @default console */
   logger?: GasWebAppLogger;
 }
@@ -78,6 +115,8 @@ interface GasWebAppNamespace {
   configure(options: GasWebAppOptions): void;
   /** @internal Resolved logger. Assign through `configure()`. */
   logger: GasWebAppLogger;
+  /** @internal Resolved tunables. Assign through `configure()`. */
+  config: GasWebAppClientConfig;
   api: GasWebAppApi;
   errors: GasWebAppErrors;
 }
