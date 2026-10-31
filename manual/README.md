@@ -5,7 +5,7 @@ Some behaviour only exists in a deployed web app: `e.pathInfo` and `e.contextPat
 The fixture is `app.js` and `views/`. `npm run manual:build` assembles it with the bundled peers, the compiled library and the compiled browser client into `.manual-webapp/`, which `clasp` pushes.
 
 > **Warning:**
-> The fixture deploys with **access: Anyone, even anonymous**, and **execute as: me**, so that `curl` needs no credentials. Use a throwaway Apps Script project, and **delete the deployment** (Deploy, Manage deployments, Archive) when the checks are done.
+> The fixture deploys with **access: Anyone, even anonymous**, and **execute as: me**, so that `curl` needs no credentials for `?route=` URLs (path URLs still need a signed-in user, see below). Use a throwaway Apps Script project, and **delete the deployment** (Deploy, Manage deployments, Archive) when the checks are done.
 
 ## Setup
 
@@ -37,7 +37,19 @@ The fixture is `app.js` and `views/`. `npm run manual:build` assembles it with t
 
 `curl -L` is required throughout, as Apps Script answers with a redirect to the content. For a POST, use `-d` and not `-X POST`: with `-L`, `-X POST` makes curl replay the POST on the redirect, which the content host rejects, while `-d` lets curl follow it with a GET. An empty body is `-d ''`.
 
-`GET $URL/` lists the fixture's routes. Echo routes answer `{ method, path, params, query, body, transport, contentType, event: { pathInfo, contextPath } }`.
+`GET $URL` lists the fixture's routes. Echo routes answer `{ method, path, params, query, body, transport, contentType, event: { pathInfo, contextPath } }`.
+
+### Path URLs need a signed-in user
+
+Apps Script treats anything after `/exec` before the script runs:
+
+| URL                        | Signed-in browser | Anonymous (`curl`)                                   |
+| -------------------------- | ----------------- | ---------------------------------------------------- |
+| `$URL`, `$URL?route=/x`    | Runs the script   | Runs the script                                      |
+| `$URL/x` (a path after it) | Runs the script   | Redirected to the Google sign-in page; never runs    |
+| `$URL/` (a trailing slash) | Apps Script 404   | Apps Script 404 ("Não foi possível abrir o arquivo") |
+
+So `?route=` is the form that works for every caller, and the `curl` commands below use it. Checks that need a path URL are marked **browser** and run in a browser signed in to the deploying account. Every page check also works anonymously as `$URL?route=/<path>`.
 
 ## Checks: routing and bodies
 
@@ -45,10 +57,10 @@ Run each command and compare. In the expected column, `data` is the envelope's d
 
 | #   | Check               | Command                                                                       | Expected                                                                                                   |
 | --- | ------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 1   | GET with pathInfo   | `curl -L "$URL/users/42"`                                                     | Envelope `ok: true`; `data.path` `/users/42`, `params` `{ id: "42" }`, `transport` `http`                  |
+| 1   | GET with pathInfo   | **browser** `$URL/users/42`                                                   | Envelope `ok: true`; `data.path` `/users/42`, `params` `{ id: "42" }`, `event.pathInfo` `users/42`         |
 | 2   | GET with route      | `curl -L "$URL?route=/users/42"`                                              | Same result                                                                                                |
-| 3   | GET with both       | `curl -L "$URL/users/1?route=/users/42"`                                      | `route` wins: `data.path` `/users/42`                                                                      |
-| 4   | POST with pathInfo  | `curl -L -d x=1 "$URL/echo"`                                                  | 404 error envelope `Cannot POST /`: pathInfo is not read on `doPost`                                       |
+| 3   | GET with both       | **browser** `$URL/users/1?route=/users/42`                                    | `route` wins: `data.path` `/users/42`                                                                      |
+| 4   | POST with pathInfo  | `curl -L -d x=1 "$URL/echo"`                                                  | Ends on the Google sign-in page: an anonymous path URL never reaches `doPost`. Record what you get         |
 | 5   | POST with route     | `curl -L -d x=1 "$URL?route=/echo"`                                           | Routed to `/echo`; `query` `{ x: "1" }`. Record whether `event.pathInfo` was set on the POST               |
 | 6   | POST form body      | `curl -L -d a=1 -d b=2 "$URL?route=/echo"`                                    | `body` absent (undefined), `query` `{ a: "1", b: "2" }`, `contentType` `application/x-www-form-urlencoded` |
 | 7   | POST JSON body      | `curl -L -H 'Content-Type: application/json' -d '{"a":1}' "$URL?route=/echo"` | `body` `{ a: 1 }`                                                                                          |
@@ -57,7 +69,7 @@ Run each command and compare. In the expected column, `data` is the envelope's d
 | 10  | `_method` override  | `curl -L -d '' "$URL?route=/items/7&_method=DELETE"`                          | `data.method` `DELETE`, `params` `{ id: "7" }`, `query` without `_method`                                  |
 | 11  | Bad `_method`       | `curl -L -d '' "$URL?route=/items/7&_method=TRACE"`                           | 400 error envelope `Invalid _method`                                                                       |
 | 12  | `_method` on GET    | `curl -L "$URL?route=/users/42&_method=DELETE"`                               | Ignored: `data.method` `GET`                                                                               |
-| 13  | contextPath, MIME   | `curl -L -i "$URL/users/42"`, and the same for any of the POSTs above         | `transport` `http`; the body is JSON text. Record `event.contextPath` and the final `Content-Type`         |
+| 13  | contextPath, MIME   | `curl -L -i "$URL?route=/users/42"`, and the same for any of the POSTs above  | `transport` `http`; the body is JSON text. Record `event.contextPath` and the final `Content-Type`         |
 
 Apps Script answers every request with HTTP 200 (P1), so judge errors by the envelope (`ok: false`, `status`, `code`, `error`), not by curl's status. The `-i` output of check 13 shows the redirect and the final response; record the final `Content-Type`.
 
@@ -65,36 +77,36 @@ Apps Script answers every request with HTTP 200 (P1), so judge errors by the env
 
 Copy the observed values into the README's platform notes, and fill in the gaps below.
 
-| Observation                                 | Value |
-| ------------------------------------------- | ----- |
-| `event.pathInfo` on GET `$URL/users/42`     |       |
-| `event.pathInfo` on POST `$URL?route=/echo` |       |
-| `event.pathInfo` on POST `$URL/echo`        |       |
-| `event.contextPath` on GET and on POST      |       |
-| Final `Content-Type` of a JSON envelope     |       |
-| Final `Content-Type` of an HTML page        |       |
+| Observation                                       | Value |
+| ------------------------------------------------- | ----- |
+| `event.pathInfo` on GET `$URL/users/42` (browser) |       |
+| `event.pathInfo` on POST `$URL?route=/echo`       |       |
+| Outcome of anonymous POST `$URL/echo` (check 4)   |       |
+| `event.contextPath` on GET and on POST            |       |
+| Final `Content-Type` of a JSON envelope           |       |
+| Final `Content-Type` of an HTML page              |       |
 
 ## Checks: pages
 
-Open each URL in a browser. The page is served inside a sandboxed iframe by `HtmlService`, so view the elements on the page, not the page source.
+Open each URL in a browser signed in to the deploying account, or use `$URL?route=/page` and so on to stay anonymous. The page is served inside a sandboxed iframe by `HtmlService`, so view the elements on the page, not the page source.
 
-| #   | Check                   | URL                                       | Expected                                                                                                                                                        |
-| --- | ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 14  | `render` with a layout  | `$URL/page`                               | Header `layout: Page with layout`, the view, and a footer line `layout markers: fromApp=app, fromRes=res, fromOptions=options`                                  |
-| 15  | Locals precedence       | `$URL/page`                               | In the view: `fromApp` is `app` (app.locals only), `fromRes` is `res` (res.locals over app.locals), `fromOptions` is `options` (render options over res.locals) |
-| 16  | `render` without layout | `$URL/bare`                               | The view and the same three markers, with no `layout:` header and no footer                                                                                     |
-| 17  | `res.redirect`          | `$URL/redirect`                           | A page reading `Redirecting to https://example.com/.`. Either the top window navigates to example.com by itself, or clicking the link does. **Record which**    |
-| 18  | Error view, 404         | `$URL/nope`                               | Page `404 NOT_FOUND` with `Cannot GET /nope`                                                                                                                    |
-| 19  | Error view, 500         | `$URL/boom`                               | Page `500 INTERNAL_ERROR` with a generic message: the thrown message `boom` must not appear                                                                     |
-| 20  | Error view only on GET  | `curl -L -d '' "$URL?route=/boom"`        | JSON error envelope, `status` 500, not HTML                                                                                                                     |
-| 21  | Error view that throws  | `$URL/teapot`, or `curl -L "$URL/teapot"` | The error view throws for status 418, so the response is the JSON error envelope (`ok: false`, `status` 418, `error` `I am a teapot`), not a page               |
-| 22  | Error view over curl    | `curl -L "$URL/nope"`                     | A `curl` GET is an HTTP GET too: it receives the HTML of check 18, not JSON                                                                                     |
+| #   | Check                   | URL                                              | Expected                                                                                                                                                        |
+| --- | ----------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 14  | `render` with a layout  | `$URL/page`                                      | Header `layout: Page with layout`, the view, and a footer line `layout markers: fromApp=app, fromRes=res, fromOptions=options`                                  |
+| 15  | Locals precedence       | `$URL/page`                                      | In the view: `fromApp` is `app` (app.locals only), `fromRes` is `res` (res.locals over app.locals), `fromOptions` is `options` (render options over res.locals) |
+| 16  | `render` without layout | `$URL/bare`                                      | The view and the same three markers, with no `layout:` header and no footer                                                                                     |
+| 17  | `res.redirect`          | `$URL/redirect`                                  | A page reading `Redirecting to https://example.com/.`. Either the top window navigates to example.com by itself, or clicking the link does. **Record which**    |
+| 18  | Error view, 404         | `$URL/nope`                                      | Page `404 NOT_FOUND` with `Cannot GET /nope`                                                                                                                    |
+| 19  | Error view, 500         | `$URL/boom`                                      | Page `500 INTERNAL_ERROR` with a generic message: the thrown message `boom` must not appear                                                                     |
+| 20  | Error view only on GET  | `curl -L -d '' "$URL?route=/boom"`               | JSON error envelope, `status` 500, not HTML                                                                                                                     |
+| 21  | Error view that throws  | `$URL/teapot`, or `curl -L "$URL?route=/teapot"` | The error view throws for status 418, so the response is the JSON error envelope (`ok: false`, `status` 418, `error` `I am a teapot`), not a page               |
+| 22  | Error view over curl    | `curl -L "$URL?route=/nope"`                     | A `curl` GET is an HTTP GET too: it receives the HTML of check 18, not JSON                                                                                     |
 
 `HtmlService` may allow a sandboxed page to navigate the top window only after a user gesture. If check 17 does not navigate by itself, click the link; if neither works, record the browser and the console error, as `res.redirect` needs a documented caveat then.
 
 ## Checks: browser client
 
-Open `$URL/client`. It loads the compiled browser client through `app.js(...)` partials, configures a short ack deadline (3 s) and writes every client log line to the panel.
+Open `$URL/client` signed in, or `$URL?route=/client`. It loads the compiled browser client through `app.js(...)` partials, configures a short ack deadline (3 s) and writes every client log line to the panel.
 
 | #   | Check              | Action                             | Expected                                                                                                                                                                   |
 | --- | ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
