@@ -1,0 +1,8 @@
+{
+  "extends": "gas-dev-config/tsconfig/test.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["src/web/**/*"]
+}

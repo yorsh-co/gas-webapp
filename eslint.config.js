@@ -1,58 +1,35 @@
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import eslintConfigPrettier from 'eslint-config-prettier';
-import globals from 'globals';
+import { gasEslint } from 'gas-dev-config/eslint';
 
-export default tseslint.config(
-  { ignores: ['dist/**', '.worktrees/**'] },
-
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
-
-  // Backend GAS files
+export default gasEslint(
   {
-    files: ['**/*.ts'],
+    web: {
+      files: ['src/web/**/*.ts'],
+      tsconfig: './tsconfig.frontend.json',
+    },
+  },
+  // Remove once gas-dev-config ^1.5.0 is adopted: the preset ships this rule.
+  {
+    files: ['src/**/*.ts'],
     ignores: ['src/web/**'],
-    languageOptions: {
-      sourceType: 'script', // no import/export — GAS files share one global scope
-      parserOptions: {
-        project: './tsconfig.json',
-      },
-    },
     rules: {
-      // tsc already checks this against the google-apps-script ambient types;
-      // ESLint's no-undef doesn't see ambient .d.ts globals and will false-positive
-      // on SpreadsheetApp, Logger, console, etc.
-      // 'no-undef': 'off',
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: ':function[async=true]',
+          message:
+            'Apps Script rejects async/await on push; Apps Script code must be synchronous.',
+        },
+        {
+          selector: 'AwaitExpression',
+          message:
+            'Apps Script rejects async/await on push; Apps Script code must be synchronous.',
+        },
+        {
+          selector: 'ForOfStatement[await=true]',
+          message:
+            'Apps Script rejects async/await on push; Apps Script code must be synchronous.',
+        },
+      ],
     },
   },
-
-  // Frontend (DOM lib, no GAS types).
-  {
-    files: ['src/web/**/*.ts'],
-    languageOptions: {
-      sourceType: 'script', // no import/export, shared window.App global
-      globals: globals.browser,
-      parserOptions: {
-        project: './tsconfig.frontend.json',
-      },
-    },
-    rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
-
-  // Node.js build scripts — ESM, full Node globals, no TS project linting.
-  {
-    files: ['scripts/**/*.js'],
-    languageOptions: {
-      sourceType: 'module',
-      globals: globals.node,
-    },
-  },
-
-  eslintConfigPrettier,
 );
