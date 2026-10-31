@@ -101,8 +101,10 @@ class GasWebAppResponse {
   }
 
   /**
-   * Navigates the top window to `url`. HtmlService serves pages in a sandboxed
-   * iframe, so the page script targets `window.top`; the link is the fallback.
+   * Sends a page that leads to `url`: a "Continue to <host>" link, plus a
+   * script that navigates the top window where the browser allows it.
+   * HtmlService serves pages in a sandboxed iframe, and browsers block that
+   * navigation without a click, so the link is the redirect in practice.
    * Only `http` and `https` URLs are accepted. Express's optional status is
    * recorded in `statusCode` and otherwise ignored.
    *
@@ -131,13 +133,26 @@ class GasWebAppResponse {
       .replace(/\u2028/g, '\\u2028')
       .replace(/\u2029/g, '\\u2029');
     const href = gasWebAppEscapeHtml(target);
+    // Apps Script has no URL global. Credentials before `@` are dropped so the
+    // page names the host the link really leads to.
+    const authority = /^https?:\/\/([^/?#]*)/i.exec(target)?.[1] ?? '';
+    const host = gasWebAppEscapeHtml(
+      authority.slice(authority.lastIndexOf('@') + 1),
+    );
 
     this.statusCode = status;
     this._send({
       kind: 'html',
       output: HtmlService.createHtmlOutput(
-        '<!DOCTYPE html><html><head><base target="_top"><title>Redirecting</title></head>' +
-          `<body><p>Redirecting to <a href="${href}" target="_top">${href}</a>.</p>` +
+        '<!DOCTYPE html><html><head><base target="_top">' +
+          '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+          `<title>Continue to ${host}</title>` +
+          '<style>body{font-family:system-ui,sans-serif;margin:3rem 1rem;text-align:center}' +
+          'a.continue{display:inline-block;padding:.75rem 1.5rem;border-radius:.5rem;' +
+          'background:#1a73e8;color:#fff;text-decoration:none;font-weight:600}' +
+          'p.url{color:#5f6368;font-size:.875rem;word-break:break-all}</style></head>' +
+          `<body><a class="continue" href="${href}" target="_top">Continue to ${host}</a>` +
+          `<p class="url">${href}</p>` +
           `<script>window.top.location.href = ${script};</script></body></html>`,
       ),
     });
