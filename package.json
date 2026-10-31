@@ -1,11 +1,29 @@
 {
   "name": "gas-webapp",
-  "version": "0.0.0",
-  "description": "Single-entry-point router and middleware for Google Apps Script web apps.",
+  "version": "1.0.0",
+  "description": "Express-style router and middleware for Google Apps Script web apps.",
   "license": "MIT",
   "author": "Joshua Porter",
   "repository": {
     "type": "git",
     "url": "https://github.com/yorsh-co/gas-webapp.git"
+  },
+  "gasLibrary": {
+    "loadOrder": [
+      "gas-webapp.response.js",
+      "gas-webapp.router.class.js",
+      "gas-webapp.constants.js",
+      "gas-webapp.class.js",
+      "middleware/gas-webapp.ack.js",
+      "middleware/gas-webapp.auth.js",
+      "middleware/gas-webapp.limiter.js",
+      "middleware/gas-webapp.idempotency.js",
+      "middleware/gas-webapp.logging.js"
+    ],
+    "peers": {
+      "gas-error": "^1.2.0",
+      "gas-logger": "^1.3.0",
+      "gas-lock": "^1.2.0"
+    }
   }
 }

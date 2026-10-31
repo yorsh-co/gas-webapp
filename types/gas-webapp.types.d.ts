@@ -1,14 +1,13 @@
 /**
  * Types for GasWebApp.
  *
- * GasWebAppRouter and its request/routing contract (RouteRequest, HttpMethod,
- * Handler, Middleware) live in this same package — see gas-router.class.ts
- * and request.types.ts.
+ * GasWebAppRouter and its request/routing contract (GasWebAppRequest,
+ * GasWebAppResponse, GasWebAppHandler) live in this same package — see
+ * gas-webapp.router.class.ts and gas-webapp.router.types.ts.
  *
  * Peer dependency (expected as a global from a sibling subtree package,
  * not redeclared here):
- *   - GasError, NotFoundError, ForbiddenError,
- *     ValidationError, errorHandler                 (gas-error)
+ *   - GasError (and its Gas*Error subclasses)        (gas-error)
  *   - GasLogger                                     (gas-logger)
  */
 /** File types resolvable to a static asset path. */
@@ -20,14 +19,20 @@ interface GasWebAppStaticConfig {
   extensions?: Partial<Record<StaticFileType, string>>;
 }
 interface GasWebAppConfig {
-  /** Passed to errorHandler for unhandled/operational errors. @default console */
+  /** Passed to GasError.handle for unhandled/operational errors. @default console */
   logger?: GasLogger | typeof console;
-  /** Static asset resolution config for render()/include()/js()/css()/html(). */
+  /** Static asset resolution config for res.render()/include()/js()/css()/html(). */
   static?: GasWebAppStaticConfig;
+  /**
+   * View rendered for errors on HTTP GET requests, named like `res.render`
+   * and given `{ error }` (the error payload) plus `app.locals`. RPC and
+   * non-GET requests keep the JSON envelope, as does a view that throws.
+   */
+  errorView?: string;
 }
 interface RenderOptions {
-  /** Set to null to render the view standalone with no layout. */
-  layout: string | null;
+  /** Layout to inject the view into. Omit or set to null to render standalone. */
+  layout?: string | null;
   [key: string]: unknown;
 }
 /** Anything doGet/doPost can legally return across either transport. */
@@ -35,4 +40,3 @@ type WebAppResponse =
   | GoogleAppsScript.HTML.HtmlOutput
   | GoogleAppsScript.Content.TextOutput
   | SuccessPayload;
-type AppResponse = JsonResponse | HtmlResponse;

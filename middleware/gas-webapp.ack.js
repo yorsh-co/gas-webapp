@@ -34,26 +34,26 @@ const createAckTracker = (config = {}) => {
   const ttlSeconds = config.ttlSeconds ?? GAS_WEBAPP_ACK_DEFAULT_TTL_SECONDS;
   const isValidCallId = (callId) => GAS_WEBAPP_ACK_CALL_ID_PATTERN.test(callId);
   const cacheKey = (callId) => `${GAS_WEBAPP_ACK_KEY_PREFIX}:${callId}`;
-  const middleware = (next) => (request) => {
-    const callId = request.params.callId;
+  const middleware = (req, _res, next) => {
+    const callId = req.query.callId;
     if (callId && isValidCallId(callId)) {
       CacheService.getScriptCache().put(cacheKey(callId), '1', ttlSeconds);
     }
-    return next(request);
+    next();
   };
-  const handler = (request) => {
-    const callIds = (request.params.callIds || '')
+  const handler = (req, res) => {
+    const callIds = (req.query.callIds || '')
       .split(',')
       .filter(isValidCallId)
       .slice(0, GAS_WEBAPP_ACK_MAX_CALL_IDS);
-    if (callIds.length === 0) return [];
+    if (callIds.length === 0) return res.json([]);
     const cache = CacheService.getScriptCache();
     const found = cache.getAll(callIds.map(cacheKey));
     const arrived = callIds.filter((callId) => !!found[cacheKey(callId)]);
     if (arrived.length > 0) {
       cache.removeAll(arrived.map(cacheKey));
     }
-    return arrived;
+    res.json(arrived);
   };
   return { middleware, handler };
 };

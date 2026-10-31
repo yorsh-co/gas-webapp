@@ -1,20 +1,21 @@
 /**
- * TODO:
  * Auth middleware factory.
  *
- * Resolves the active user's email via Session, then defers the actual
+ * Resolves the active user's email via Session, rejecting the request with a
+ * 401 when it cannot be determined (scope declined, or an anonymous or
+ * consumer account), then defers the actual
  * authorization decision to the injected `isAuthorized` check — same
  * pattern as `keyFn` on the rate limiters: the mechanism is generic, the
  * app-specific policy (an allow-list, a Sheet lookup, etc.) is supplied
- * by the consumer.
+ * by the consumer. The identified user is set on `req.user`.
  *
  * Usage:
  *   webApp.use(createAuthMiddleware({
  *     isAuthorized: (email) => AUTHORIZED_EMAILS.includes(email),
  *   }));
  *
- * Peer dependency: UnauthorizedError (gas-error).
+ * Peer dependency: GasUnauthorizedError (gas-error).
  */
 declare const createAuthMiddleware: (
   config: AuthMiddlewareConfig,
-) => Middleware;
+) => GasWebAppHandler;
