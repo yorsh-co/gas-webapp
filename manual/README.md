@@ -47,8 +47,8 @@ Apps Script handles anything after `/exec` before the script runs:
 | ------------------------------ | --------------------------------- | ------------------------------------------------- |
 | `$URL`, `$URL?route=/x`        | Runs the script                   | Runs the script                                   |
 | GET `$URL/x` (a path after it) | Runs the script; `e.pathInfo` `x` | Redirected to the Google sign-in page; never runs |
-| POST `$URL/x?route=/x`         | To confirm                        | Runs the script; `e.pathInfo` `x`                 |
-| POST `$URL/x` (no `route`)     | To confirm                        | Runs the script; routed by `e.pathInfo`           |
+| POST `$URL/x?route=/x`         | Runs the script; `e.pathInfo` `x` | Runs the script; `e.pathInfo` `x`                 |
+| POST `$URL/x` (no `route`)     | Runs the script; routed by path   | Runs the script; routed by `e.pathInfo`           |
 | `$URL/` (a trailing slash)     | Apps Script 404                   | Apps Script 404                                   |
 
 So `?route=` is the form that works for every caller, and the `curl` GET commands below use it. Checks that need a GET path URL are marked **browser** and run in a browser signed in to the deploying account. Every page check also works anonymously as `$URL?route=/<path>`.
@@ -72,7 +72,7 @@ Run each command and compare. In the expected column, `data` is the envelope's d
 | 11  | Bad `_method`                 | `curl -L -d '' "$URL?route=/items/7&_method=TRACE"`                           | 400 error envelope `Invalid _method`                                                                         |
 | 12  | `_method` on GET              | `curl -L "$URL?route=/users/42&_method=DELETE"`                               | Ignored: `data.method` `GET`                                                                                 |
 | 13  | contextPath, MIME             | `curl -L -i "$URL?route=/users/42"`, and the same for any of the POSTs above  | `transport` `http`; the body is JSON text; `event.contextPath` `""`; final `Content-Type` `application/json` |
-| 28  | POST with pathInfo, signed in | **browser** or `curl` with a signed-in session: POST `$URL/echo`              | To confirm: routed to `/echo` with `event.pathInfo` `"echo"`                                                 |
+| 28  | POST with pathInfo, signed in | **browser** or `curl` with a signed-in session: POST `$URL/echo`              | Routed to `/echo` with `event.pathInfo` `"echo"`. Confirmed with an HTML form in a signed-in browser         |
 
 Apps Script answers every request with HTTP 200 (P1), so judge errors by the envelope (`ok: false`, `status`, `code`, `error`), not by curl's status. The `-i` output of check 13 shows the redirect and the final response; record the final `Content-Type`.
 
@@ -86,7 +86,7 @@ Observed on a deployed web app, and recorded in the README's platform notes.
 | `event.pathInfo` on anonymous POST `$URL/echo?route=/echo` | `"echo"`                                                                                                            |
 | Outcome of anonymous GET `$URL/users/42`                   | Redirected to the Google sign-in page; the script never runs                                                        |
 | Outcome of anonymous POST `$URL/echo` (check 4)            | Reaches `doPost`; routed by `pathInfo` since the fix (before it: 404 `Cannot POST /`)                               |
-| Outcome of signed-in POST with a path (check 28)           | To confirm                                                                                                          |
+| Outcome of signed-in POST with a path (check 28)           | Runs; routed to `/echo`, `pathInfo` `"echo"`                                                                        |
 | Outcome of `$URL/`                                         | Apps Script's own 404 page; the script does not run                                                                 |
 | `event.contextPath` on GET and on POST                     | `""`                                                                                                                |
 | Final `Content-Type` of a JSON envelope                    | 302 (`application/binary`) to `script.googleusercontent.com/macros/echo...`, then `application/json; charset=utf-8` |
@@ -118,7 +118,7 @@ Open `$URL/client` signed in, or `$URL?route=/client`. It loads the compiled bro
 
 | #   | Check              | Action                             | Expected                                                                                                                                                                   |
 | --- | ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 23  | `api.get`          | Click `api.get /users/1`           | `get: { method: "GET", path: "/users/1", params: { id: "1" }, transport: "rpc", ... }`, with no `pathInfo` or `contextPath` in `event`                                     |
+| 23  | `api.get`          | Click `api.get /users/1`           | `get: { method: "GET", path: "/users/1", params: { id: "1" }, transport: "rpc", ... }`, with `event.pathInfo` and `event.contextPath` `null` (no path over RPC)            |
 | 24  | `api.delete`       | Click `api.delete /items/7`        | `delete: { method: "DELETE", path: "/items/7", ... }`: the `_method` override works over `google.script.run`                                                               |
 | 25  | `api.post`         | Click `api.post /echo`             | `post: { method: "POST", body: { a: 1 }, ... }`                                                                                                                            |
 | 26  | Server error       | Click `api.get /nope (expect 404)` | `missing rejected: { status: 404, code: "NOT_FOUND" }`                                                                                                                     |
