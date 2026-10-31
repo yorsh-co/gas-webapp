@@ -2,7 +2,7 @@
 
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-10-31
 
 First tagged release, planned as 1.0.0. The API changed throughout against the untagged 0.x code; see the [migration guide](docs/migration-1.0.md).
 
