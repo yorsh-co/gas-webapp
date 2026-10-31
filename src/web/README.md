@@ -18,14 +18,13 @@ Ships from the same repository on a separate `dist-web` release branch, since `g
 
 ### Requirements
 
-This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together — `scripts/sync-gas-webapp.sh` does this by default, pulling both branches at the same ref unless you override them separately.
+This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together: the `gas-webapp` range in `gasDevBundle.libraries` and the `dist-web` ref you subtree.
 
 ## Add the library to your Apps Script project
 
-Installed together with the backend (and `gas-error`/`gas-logger`) via `scripts/sync-gas-webapp.sh` — see the [backend README's Quick Start](../README.md#quick-start) for the download-and-run command. Running it without `--backend-only` adds this package too:
+Installed with `scripts/sync-gas-webapp.sh` or `git subtree` — see the [backend README's Quick Start](../README.md#quick-start). The backend and its peers are installed separately, with gas-dev-bundle. The client lands in:
 
 ```txt
-src/lib/gas-webapp/
 src/web/public/js/lib/gas-webapp/
 ```
 

@@ -64,7 +64,7 @@ const doPost = webApp.doPost;
 
 ### Peer Dependencies
 
-`gas-webapp` expects the following as globals at runtime — both are separate subtree packages, added the same way as `gas-webapp` itself.
+`gas-webapp` expects the following as globals at runtime — each is a separate gas-\* library, bundled alongside `gas-webapp` by gas-dev-bundle.
 
 | Package                                                | Required | Used for                                                                                                                      |
 | ------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -97,9 +97,45 @@ If using `createAuthMiddleware`, the deployment's **Execute as** setting must re
 
 It is recommended to use `gas-webapp` together with [Google's `clasp` CLI](https://github.com/google/clasp) for local Apps Script development and git-based workflows. See [Setup instructions with `clasp`](#setup-instructions-with-clasp) for more information.
 
-#### 1. Add the library and its peer dependencies
+#### 1. Add the library to your Apps Script project
 
-This repository publishes compiled output on two branches — `dist` (backend) and `dist-web` (browser client) — since `git subtree` imports a branch root and has no way to select a subdirectory. `gas-error` (required) and `gas-logger` (optional) are separate repos again. `scripts/sync-gas-webapp.sh` adds all of it in one step; download it once and run it from your project root:
+##### Backend: gas-dev-bundle
+
+[gas-dev-bundle](https://github.com/yorsh-co/gas-dev-bundle) resolves version ranges against the libraries' release tags and writes them into one script, in dependency order.
+
+```bash
+npm install -D github:yorsh-co/gas-dev-bundle#semver:^1.1.1
+```
+
+List the libraries in your `package.json`:
+
+```json
+{
+  "gasDevBundle": {
+    "outFile": "src/lib/gas-libraries.js",
+    "libraries": {
+      "gas-webapp": "^1.0.0",
+      "gas-error": "^1.2.0",
+      "gas-logger": "^1.3.0",
+      "gas-lock": "^1.2.0"
+    }
+  }
+}
+```
+
+```bash
+npx gas-dev-bundle
+```
+
+- Commit the generated file. Its header records each library's version and commit SHA.
+- Re-run the command after changing a range to upgrade.
+- List `gas-error` even though it is a peer: gas-dev-bundle treats peers as optional and never adds one on its own, so a bundle without it fails only at runtime. `gas-logger` and `gas-lock` can be left out; see [Peer Dependencies](#peer-dependencies).
+
+See the [gas-dev-bundle README](https://github.com/yorsh-co/gas-dev-bundle) for configuration details.
+
+##### Browser client: git subtree
+
+gas-dev-bundle covers Apps Script code only. The browser client ships on its own `dist-web` branch; `scripts/sync-gas-webapp.sh` adds it, and later pulls updates. Download it once and run it from your project root:
 
 ```bash
 curl -o scripts/sync-gas-webapp.sh \
@@ -108,19 +144,21 @@ curl -o scripts/sync-gas-webapp.sh \
     && scripts/sync-gas-webapp.sh
 ```
 
+Or add it directly with git subtree:
+
+```bash
+git subtree add \
+  --prefix=src/web/public/js/lib/gas-webapp \
+  https://github.com/yorsh-co/gas-webapp.git \
+  dist-web \
+  --squash
+```
+
 This creates:
 
 ```txt
-src/lib/gas-webapp/
 src/web/public/js/lib/gas-webapp/
-src/lib/gas-error/
-src/lib/gas-logger/
 ```
-
-Keep the downloaded script — running it again later pulls updates for whatever's already present, no separate command to remember. See [Peer Dependencies](#peer-dependencies) for what each of these is for.
-
-> **Note:**
-> Only need the backend, with no browser client? `scripts/sync-gas-webapp.sh --backend-only` skips the browser client and still brings in `gas-error`/`gas-logger`. Only need `gas-webapp` itself, with none of this? `git subtree add --prefix=src/lib/gas-webapp https://github.com/yorsh-co/gas-webapp.git dist --squash` works standalone.
 
 #### 2. Configure Apps Script deployment
 
@@ -180,23 +218,7 @@ clasp create --type webapp
 
 #### 5. Import `gas-webapp` and its peer dependencies
 
-`gas-webapp` ships as two subtrees — backend and browser client — and pulls in `gas-error`/`gas-logger` alongside them, all via `scripts/sync-gas-webapp.sh`. Download it once and run it from your project root:
-
-```bash
-curl -o scripts/sync-gas-webapp.sh \
-    https://raw.githubusercontent.com/yorsh-co/gas-webapp/main/scripts/sync-gas-webapp.sh \
-    && chmod +x scripts/sync-gas-webapp.sh \
-    && scripts/sync-gas-webapp.sh
-```
-
-This creates:
-
-```txt
-src/lib/gas-webapp/
-src/web/public/js/lib/gas-webapp/
-src/lib/gas-error/
-src/lib/gas-logger/
-```
+Use the [gas-dev-bundle method](#1-add-the-library-to-your-apps-script-project) from the Quick Start for the backend and `gas-error`, `gas-logger` and `gas-lock`, and the same section for the browser client.
 
 #### 6. Configure the file push order
 

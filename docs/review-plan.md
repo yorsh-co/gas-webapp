@@ -367,14 +367,14 @@ Branch: `feature/transport`. Closes X2, X6 (client side), X8, C4.
 Branch: `feature/gas-dev-release`. Closes T2, T4.
 
 - [x] Add gas-dev-release (`^1.1.0`) and `"release": "gas-dev-release"`.
-- [x] `gasDevRelease.targets`: `dist` (backend, `web/` excluded) and `dist-web` (from `dist/web`, with `src/web/README.md` as its README), both with `packageJson: true`.
+- [x] `gasDevRelease.targets`: `dist` (backend, `web/` excluded) and `dist-web` (from `dist/web`, with `src/web/README.md` as its README). `dist` has `packageJson: true`; `dist-web` has `packageJson: false`, because gas-dev-release writes `gasLibrary` into every target with a `package.json` and rejects the web build, which has none of the backend load order files.
 - [x] Delete `scripts/release.sh` and `scripts/write-release-package-json.js`.
-- [ ] Add `peer/gas-webapp.peer.types.d.ts` as the canonical declaration for downstream gas-\* libraries.
-- [ ] Reduce `scripts/sync-gas-webapp.sh` to the browser client; document gas-dev-bundle for the backend and its peers (P6, P7).
-- [ ] `npm run release -- --dry-run` stages both targets with `v`-prefixed tags.
-- [ ] The dry-run `dist` `package.json` carries `gasLibrary` that gas-dev-bundle accepts.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated.
+- [x] Add `peer/gas-webapp.peer.types.d.ts` as the canonical declaration for downstream gas-\* libraries.
+- [x] Reduce `scripts/sync-gas-webapp.sh` to the browser client; document gas-dev-bundle for the backend and its peers (P6, P7).
+- [x] `npm run release -- --dry-run` stages both targets with `v`-prefixed tags.
+- [x] The dry-run `dist` `package.json` carries `gasLibrary` that gas-dev-bundle accepts.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 8: documentation and v1.0.0
