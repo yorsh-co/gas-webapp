@@ -14,7 +14,11 @@
  *   <?!= webApp.include('partials/Header'); ?>
  */
 class GasWebApp extends GasWebAppRouter {
+  /** Data merged into every `res.render`, under `res.locals` and the render options. */
+  locals: Record<string, unknown> = {};
+
   private _logger: GasLogger | typeof console;
+  private _errorView: string | undefined;
   private _staticDirs: Record<StaticFileType, string>;
   private _staticExtensions: Record<StaticFileType, string>;
 
@@ -22,6 +26,7 @@ class GasWebApp extends GasWebAppRouter {
     super();
 
     this._logger = config.logger || console;
+    this._errorView = config.errorView;
     this._staticDirs = {
       ...GAS_WEBAPP_DEFAULT_STATIC_DIRS,
       ...config.static?.dirs,
@@ -100,40 +105,57 @@ class GasWebApp extends GasWebAppRouter {
     entryMethod: 'GET' | 'POST',
   ): WebAppResponse {
     let req: GasWebAppRequest | undefined;
+    let res: GasWebAppResponse | undefined;
 
     try {
       req = this._normalizeRequest(e, entryMethod);
-      const res = new GasWebAppResponse(req.transport, (type, path) =>
-        this.resolveStaticFilePath(type, path),
-      );
+      res = this._createResponse(req.transport);
       this._dispatch(req, res);
-      return this._serialize(res, req);
     } catch (err) {
-      return this._fail(err, e, entryMethod, req);
+      res ??= this._createResponse(this._transportOf(e));
+      this._resolveError(err, e, entryMethod, req, res);
     }
+
+    return this._serialize(res, this._transportOf(e));
+  }
+
+  private _createResponse(transport: GasWebAppTransport): GasWebAppResponse {
+    return new GasWebAppResponse(
+      transport,
+      (type, path) => this.resolveStaticFilePath(type, path),
+      this.locals,
+    );
   }
 
   /**
-   * Runs the router stack, then the final handler: a pending error is thrown
-   * to `_fail`, and a request nothing answered is a 404, or a 500 when a
-   * layer stopped without responding or calling `next`.
+   * Runs the router stack. A pending error, or a request nothing answered (a
+   * 404), is resolved into `res` as the stack finishes, before control returns
+   * through the `next()` calls, so middleware reads the final status. A layer
+   * that stops without responding or calling `next` is a 500, thrown to the
+   * caller.
    */
   private _dispatch(req: GasWebAppRequest, res: GasWebAppResponse): void {
-    let exhausted = false;
-    let pending: unknown;
-
     this.handle(req, res, (err) => {
-      exhausted = true;
-      pending = err;
+      if (err !== undefined && err !== null) {
+        this._resolveError(err, req.raw, req.method, req, res);
+      } else if (!res.sent) {
+        const target = `${req.method} ${req.originalPath}`;
+        this._resolveError(
+          new GasNotFoundError(`Cannot ${target}`),
+          req.raw,
+          req.method,
+          req,
+          res,
+        );
+      }
     });
 
-    if (exhausted && pending !== undefined && pending !== null) throw pending;
     if (res.sent) return;
 
-    const target = `${req.method} ${req.originalPath}`;
-    if (exhausted) throw new GasNotFoundError(`Cannot ${target}`);
-
-    throw new GasError(`Route did not respond: ${target}`, { statusCode: 500 });
+    throw new GasError(
+      `Route did not respond: ${req.method} ${req.originalPath}`,
+      { statusCode: 500 },
+    );
   }
 
   /** A real web app request carries `contextPath`; `google.script.run` calls do not. */
@@ -147,31 +169,37 @@ class GasWebApp extends GasWebAppRouter {
     );
   }
 
+  private _transportOf(
+    e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
+  ): GasWebAppTransport {
+    return this._isHttpRequest(e) ? 'http' : 'rpc';
+  }
+
   /**
-   * The single error path: logs through `GasError.handle`, then rethrows the
-   * JSON envelope to RPC callers or returns it as JSON text output to HTTP
-   * callers.
+   * The single error path: logs through `GasError.handle` and records the
+   * safe payload on `res`, as an HTML page when `errorView` is set and the
+   * request is an HTTP GET. `_serialize` turns it into the response.
    */
-  private _fail(
+  private _resolveError(
     err: unknown,
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
-    entryMethod: 'GET' | 'POST',
-    req?: GasWebAppRequest,
-  ): WebAppResponse {
-    const context = {
+    entryMethod: string,
+    req: GasWebAppRequest | undefined,
+    res: GasWebAppResponse,
+  ): void {
+    const payload = GasError.handle(err, {
       logger: this._logger,
       method: req?.method ?? entryMethod,
       path: req?.originalPath ?? e?.parameter?.route ?? '',
       sessionId: req?.user?.email ?? '',
-    };
+      rethrow: false,
+    });
+    const asPage =
+      this._errorView !== undefined &&
+      this._transportOf(e) === 'http' &&
+      (req?.method ?? entryMethod) === 'GET';
 
-    if (!this._isHttpRequest(e)) return GasError.handle(err, context);
-
-    const payload = GasError.handle(err, { ...context, rethrow: false });
-
-    return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(
-      ContentService.MimeType.JSON,
-    );
+    res.fail(payload, asPage ? this._errorView : undefined);
   }
 
   /**
@@ -251,9 +279,13 @@ class GasWebApp extends GasWebAppRouter {
     return postData.contents;
   }
 
+  /**
+   * @throws {Error} Over `google.script.run`, an error outcome is thrown with
+   * the JSON envelope as its message, as `GasError.handle` does.
+   */
   private _serialize(
     res: GasWebAppResponse,
-    req: GasWebAppRequest,
+    transport: GasWebAppTransport,
   ): WebAppResponse {
     const outcome = res.outcome as GasWebAppOutcome;
 
@@ -265,10 +297,15 @@ class GasWebApp extends GasWebAppRouter {
       );
     }
 
-    return req.transport === 'http'
-      ? ContentService.createTextOutput(
-          JSON.stringify(outcome.payload),
-        ).setMimeType(ContentService.MimeType.JSON)
-      : outcome.payload;
+    if (transport === 'rpc') {
+      if (outcome.kind === 'error') {
+        throw new Error(JSON.stringify(outcome.payload));
+      }
+      return outcome.payload;
+    }
+
+    return ContentService.createTextOutput(
+      JSON.stringify(outcome.payload),
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 }

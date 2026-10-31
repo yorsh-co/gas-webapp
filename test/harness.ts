@@ -31,6 +31,7 @@ export interface GasWebAppRouterInstance {
 export interface GasWebAppInstance extends GasWebAppRouterInstance {
   doGet(e: object): unknown;
   doPost(e: object): unknown;
+  locals: Record<string, unknown>;
   resolveStaticFilePath(type: 'html' | 'js' | 'css', path: string): string;
 }
 
@@ -58,6 +59,7 @@ export interface TestResponse {
   json(data: unknown): void;
   send(body: unknown): void;
   render(view: string, options?: object): void;
+  redirect(statusOrUrl: number | string, url?: string): void;
 }
 
 export type TestNext = (err?: unknown) => void;

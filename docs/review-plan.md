@@ -308,20 +308,20 @@ Branch: `feature/express-router`. Closes R1–R5, X1, X3, X5, X6 (server side), 
 Branch: `feature/express-middleware`. Closes M3, X4, X7.
 
 - [x] Signature port of `createAckTracker`, `createAuthMiddleware` (`req.user`), `createRateLimiter`, `createConcurrencyLimiter` and `createLoggingMiddleware` moved into Phase 4.
-- [ ] Logging reports the status of errors, which are only serialised after the stack (the final error handler runs after `next()` returns), so an errored request logs `res.statusCode` 200 today (M3).
-- [ ] Errors are logged once, by the error handler (M3).
-- [ ] Logged parameters pass through a configurable redaction list (M3).
-- [ ] Rate limiter defaults to `lockScope: 'user'`; the scope rule and the `'script'` throughput cost are documented (X7).
-- [ ] `res.status(>= 400).json(data)` sends a gas-error-shaped envelope (`ok: false`, `code` derived from the status as gas-error does, `error` from `data.message` when it is a string, otherwise a generic message; `data` as `details`) and is thrown over RPC, so the browser client rejects it like any other error. Today it sends `ok: true` and the client resolves.
-- [ ] `res.render` merges `app.locals` and `res.locals` into the template (X4).
-- [ ] `res.redirect` as an HTTP-only top-window navigation (X4, P2).
-- [ ] Optional HTML error view for page routes, falling back to the JSON envelope (X4).
-- [ ] Unit tests for every built-in middleware on the new signature.
-- [ ] Unit test: the ack route stays out of the limiters purely by registration order.
-- [ ] Apps Script tests: `CacheService`-backed ack and rate limiting, `LockService` contention in the concurrency limiter, an `info()` probe for `Session` email availability.
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated.
+- [x] Logging reports the status of errors, which are only serialised after the stack (the final error handler runs after `next()` returns), so an errored request logs `res.statusCode` 200 today (M3).
+- [x] Errors are logged once, by the error handler (M3).
+- [x] Logged parameters pass through a configurable redaction list (M3).
+- [x] Rate limiter defaults to `lockScope: 'user'`; the scope rule and the `'script'` throughput cost are documented (X7).
+- [x] `res.status(>= 400).json(data)` sends a gas-error-shaped envelope (`ok: false`, `code` derived from the status as gas-error does, `error` from `data.message` when it is a string, otherwise a generic message; `data` as `details`) and is thrown over RPC, so the browser client rejects it like any other error. Today it sends `ok: true` and the client resolves.
+- [x] `res.render` merges `app.locals` and `res.locals` into the template (X4).
+- [x] `res.redirect` as an HTTP-only top-window navigation (X4, P2).
+- [x] Optional HTML error view for page routes, falling back to the JSON envelope (X4).
+- [x] Unit tests for every built-in middleware on the new signature.
+- [x] Unit test: the ack route stays out of the limiters purely by registration order.
+- [x] Apps Script tests: `CacheService`-backed ack and rate limiting, `LockService` contention in the concurrency limiter, an `info()` probe for `Session` email availability.
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 6: transport

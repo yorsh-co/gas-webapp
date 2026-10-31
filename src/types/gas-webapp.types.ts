@@ -26,6 +26,12 @@ interface GasWebAppConfig {
   logger?: GasLogger | typeof console;
   /** Static asset resolution config for res.render()/include()/js()/css()/html(). */
   static?: GasWebAppStaticConfig;
+  /**
+   * View rendered for errors on HTTP GET requests, named like `res.render`
+   * and given `{ error }` (the error payload) plus `app.locals`. RPC and
+   * non-GET requests keep the JSON envelope, as does a view that throws.
+   */
+  errorView?: string;
 }
 
 interface RenderOptions {

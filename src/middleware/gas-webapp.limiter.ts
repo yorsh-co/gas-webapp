@@ -26,6 +26,12 @@ const GAS_WEBAPP_DEFAULT_LOCK_SERVICE: GasWebAppLockService = Object.freeze({
  * Fixed-window counter backed by CacheService. The window boundary is
  * baked into the cache key, so expiry happens for free via CacheService's
  * TTL — no separate cleanup job needed.
+ *
+ * The counter is read and written under a lock, and `lockScope` must cover the
+ * scope of `keyFn`'s key: a per-user key is safe under the default `'user'`
+ * lock, but a key shared across users needs `'script'`. A script lock
+ * serialises every request that goes through the limiter, each waiting up to
+ * 10 s for it.
  */
 const createRateLimiter = (config: RateLimitConfig): GasWebAppHandler => {
   const lockService = config.lockService ?? GAS_WEBAPP_DEFAULT_LOCK_SERVICE;
@@ -41,7 +47,7 @@ const createRateLimiter = (config: RateLimitConfig): GasWebAppHandler => {
       Math.ceil((windowEndMs - Date.now()) / 1000),
     );
 
-    const lock = lockService.getLock(config.lockScope);
+    const lock = lockService.getLock(config.lockScope ?? 'user');
     if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
       throw new GasRateLimitError(
         'Too many requests — try again',
@@ -69,6 +75,7 @@ const createRateLimiter = (config: RateLimitConfig): GasWebAppHandler => {
 
 /**
  * Caps simultaneous in-flight requests rather than requests-per-window.
+ * `lockScope` follows the same rule as in `createRateLimiter`.
  * The counter carries a safety TTL covering the 6-minute execution limit, so
  * a crashed execution that never reaches the `finally` release doesn't
  * permanently hold a slot. A contended release is retried once before the
@@ -106,7 +113,7 @@ const createConcurrencyLimiter = (
 
   return (req, _res, next) => {
     const key = `concurrency:${config.keyFn(req)}`;
-    const lock = lockService.getLock(config.lockScope);
+    const lock = lockService.getLock(config.lockScope ?? 'user');
 
     const after = adjust(key, lock, +1);
     if (after > config.limit) {
