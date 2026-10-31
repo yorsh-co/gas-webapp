@@ -4,16 +4,26 @@
  * `interface Window` is augmented rather than redefined, so a consuming app can
  * declare its own `window.App` in a separate ambient file and the two merge.
  */
-type ApiMethod = 'GET' | 'POST';
+type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 interface ApiRequestOptions {
-  /** Merged into `e.parameter` alongside `route`. Values must be strings. */
+  /** Merged into `e.parameter` alongside `route`. Values must be strings; `route`, `callId`, `_method` and `idempotencyKey` are reserved and reject with `CLIENT_ERROR`. */
   params?: Record<string, string>;
-  /** POST only — JSON-serialized into `e.postData.contents`. */
+  /** Not sent on GET — JSON-serialized into `e.postData.contents`. */
   body?: unknown;
   /** Client-side deadline. The server keeps running past it. @default 30000 */
   timeoutMs?: number;
-  /** Retries after the first attempt. @default 2 for GET, 0 for POST */
+  /**
+   * Retries after the first attempt. @default `getRetries` for GET, or when
+   * `idempotencyKey` is set; 0 for POST, PUT, PATCH and DELETE
+   */
   retries?: number;
+  /**
+   * Sent as the reserved `idempotencyKey` parameter, for a route guarded by
+   * the backend's `createIdempotencyGuard`. `true` generates one UUID per
+   * logical request, reused by every retry attempt. Use a UUID when passing
+   * your own. Makes the request retry by default.
+   */
+  idempotencyKey?: string | true;
   /**
    * Watch for delivery confirmation before deciding a silent call failed.
    * Only the ack poll itself sets this to `false`. @default true
@@ -46,7 +56,7 @@ interface GasWebAppLogger {
 interface GasWebAppClientConfig {
   /** Client-side deadline per call, unless overridden. @default 30000 */
   timeoutMs: number;
-  /** Retries after the first attempt, GET only. @default 2 */
+  /** Retries after the first attempt, GET and keyed requests. @default 2 */
   getRetries: number;
   /** First backoff window; doubles each attempt. @default 400 */
   retryBaseMs: number;
@@ -68,7 +78,7 @@ interface GasWebAppClientConfig {
   ackPollTimeoutMs: number;
   /**
    * How long a call may go unacknowledged before it counts as undelivered.
-   * @default 8000
+   * @default 15000
    */
   ackDeadlineMs: number;
   /** Logger scope for ack-watcher diagnostics. @default 'Ack Watcher' */
@@ -91,6 +101,17 @@ interface GasWebAppApi {
     body?: unknown,
     options?: ApiRequestOptions,
   ): Promise<T>;
+  put<T = unknown>(
+    route: string,
+    body?: unknown,
+    options?: ApiRequestOptions,
+  ): Promise<T>;
+  patch<T = unknown>(
+    route: string,
+    body?: unknown,
+    options?: ApiRequestOptions,
+  ): Promise<T>;
+  delete<T = unknown>(route: string, options?: ApiRequestOptions): Promise<T>;
 }
 interface GasWebAppErrors {
   readonly CLIENT_TIMEOUT_CODE: string;

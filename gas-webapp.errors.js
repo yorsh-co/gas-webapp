@@ -2,7 +2,7 @@
 /**
  * Server error contract for the client.
  *
- * `errorHandler` always throws, and for `google.script.run` callers
+ * `GasError.handle` throws by default, and for `google.script.run` callers
  * `GasWebApp._handleRequest` re-throws — so every server-side failure reaches
  * the client through `withFailureHandler` as an `Error` whose `.message` is the
  * JSON payload `{ ok, error, status, code, details? }`.
