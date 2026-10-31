@@ -23,3 +23,16 @@
 - `scripts/sync-gas-webapp.sh` — a standalone installer, distributed for consumers to download rather than reimplement, that installs or updates the backend, browser client, and `gas-error`/`gas-logger` peer dependencies together in one reviewable operation; each target is added if missing or pulled if already present, and `--backend-only` skips the browser client
 - Optional `lockService` on `createRateLimiter`/`createConcurrencyLimiter` configs, accepting any object exposing `getLock(scope)`. Pass [`gas-lock`](https://github.com/yorsh-co/gas-lock) to route limiter locks through the same registry as the rest of the app; omitted, both resolve `LockService` directly
 - Client tunables on `GasWebApp.configure()` — timeout, retry count/backoff, retryable statuses, and the ack route/poll/deadline settings, all previously fixed in the client source. `ackRoute` in particular now matches apps that mount `ack.handler` somewhere other than `/ack`
+
+### Changed
+
+- Prettier, TypeScript and ESLint configuration now come from [`gas-dev-config`](https://github.com/yorsh-co/gas-dev-config); the backend compiles to ES2020, as Apps Script rejects newer syntax on push
+- Releases are published by [`gas-dev-release`](https://github.com/yorsh-co/gas-dev-release) to the `dist` and `dist-web` branches
+- `async` functions and `await` are lint errors in the backend sources
+- `gasDevConfig` in `package.json` declares the load order and the `gas-error`, `gas-logger` and `gas-lock` peers
+- Added a Vitest suite that loads the library in a sandboxed global scope
+
+### Removed
+
+- `scripts/release.sh` and `scripts/write-release-package-json.js`, replaced by `gas-dev-release`
+- `.prettierrc.json` and `tsconfig.base.json`, replaced by the shared presets

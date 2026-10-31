@@ -1,10 +1,8 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "gas-dev-config/tsconfig/gas.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist",
-    "types": ["google-apps-script"],
-    "lib": ["ES2021"]
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/web/**/*"]

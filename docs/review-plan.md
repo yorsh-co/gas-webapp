@@ -214,21 +214,23 @@ Repository: `gas-dev-config`. Branch: `feature/no-async-rule`. Guards P8 for eve
 
 Branch: `feature/gas-dev-config`. Closes T1, B3; guards P8. No runtime behaviour change.
 
-- [ ] Add `gas-dev-config` (`^1.4.1`), `@types/node` and `@google/clasp` as dev dependencies.
-- [ ] Remove `@eslint/js`, `typescript-eslint`, `eslint-config-prettier` and `globals` from dev dependencies.
-- [ ] Set `"prettier": "gas-dev-config/prettier"`; delete `.prettierrc.json`.
-- [ ] `tsconfig.json` extends `gas-dev-config/tsconfig/gas.json`; target becomes ES2020.
-- [ ] `tsconfig.frontend.json` extends `gas-dev-config/tsconfig/web.json`.
-- [ ] Delete `tsconfig.base.json`.
-- [ ] `eslint.config.js` uses `gasEslint({ web: { files: ['src/web/**/*.ts'], tsconfig: './tsconfig.frontend.json' } })`.
-- [ ] Until gas-dev-config 1.5.0 is released, mirror Phase 0's rule as an extra flat config in `eslint.config.js`, marked for removal once the dependency is bumped.
-- [ ] Add `gasDevConfig.loadOrder`: response, router, constants, class, then `middleware/*`.
-- [ ] Confirm `gas-dev-config check` and gas-dev-release accept nested `middleware/` paths in `loadOrder`; if not, raise it against those tools before flattening anything here.
-- [ ] Add `gasDevConfig.peers`: gas-error `^1.2.0`, gas-logger `^1.3.0`, gas-lock `^1.2.0`.
-- [ ] Align `.gitignore`, `.prettierignore`, `.github/dependabot.yml` and the `package.json` scripts with `gas-dev-config check`.
-- [ ] Diff `dist/` before and after: only ES2020 downlevelling differs.
-- [ ] `npm run check` passes, including `gas-dev-config check`.
-- [ ] CHANGELOG `[Unreleased]` updated.
+Pulled forward because `gas-dev-config check` requires the standard `release` and `test` scripts: the gas-dev-release setup from Phase 7 (dependency, script, `gasDevRelease` targets, deletion of the release scripts) and the minimal Vitest setup from Phase 2 (`tsconfig.test.json`, `test/harness.ts`, one load test).
+
+- [x] Add `gas-dev-config` (`^1.4.1`), `@types/node` and `@google/clasp` as dev dependencies.
+- [x] Remove `@eslint/js`, `typescript-eslint`, `eslint-config-prettier` and `globals` from dev dependencies.
+- [x] Set `"prettier": "gas-dev-config/prettier"`; delete `.prettierrc.json`.
+- [x] `tsconfig.json` extends `gas-dev-config/tsconfig/gas.json`; target becomes ES2020.
+- [x] `tsconfig.frontend.json` extends `gas-dev-config/tsconfig/web.json`.
+- [x] Delete `tsconfig.base.json`.
+- [x] `eslint.config.js` uses `gasEslint({ web: { files: ['src/web/**/*.ts'], tsconfig: './tsconfig.frontend.json' } })`.
+- [x] Until gas-dev-config 1.5.0 is released, mirror Phase 0's rule as an extra flat config in `eslint.config.js`, marked for removal once the dependency is bumped.
+- [x] Add `gasDevConfig.loadOrder`: response, router, constants, class, then `middleware/*`.
+- [x] Confirm `gas-dev-config check` and gas-dev-release accept nested `middleware/` paths in `loadOrder`; if not, raise it against those tools before flattening anything here.
+- [x] Add `gasDevConfig.peers`: gas-error `^1.2.0`, gas-logger `^1.3.0`, gas-lock `^1.2.0`.
+- [x] Align `.gitignore`, `.prettierignore`, `.github/dependabot.yml` and the `package.json` scripts with `gas-dev-config check`.
+- [x] Diff `dist/` before and after: only ES2020 downlevelling differs.
+- [x] `npm run check` passes, including `gas-dev-config check`.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 2: current peers and test harnesses
@@ -238,8 +240,8 @@ Branch: `feature/peer-upgrade`. Closes B1, B2; starts T3.
 - [ ] Replace `src/internal/gas-webapp.peer.types.ts` with the canonical `peer/*.d.ts` from gas-error 1.2.1, gas-logger 1.3.1 and gas-lock 1.2.1.
 - [ ] Migrate every `errorHandler` call to `GasError.handle`.
 - [ ] Migrate every error class to its `Gas*` name.
-- [ ] Add `tsconfig.test.json`, Vitest and the `test`/`test:watch` scripts.
-- [ ] Add `test/harness.ts` using `createGasLoader` with `loadOrderFiles`.
+- [x] Add `tsconfig.test.json`, Vitest and the `test`/`test:watch` scripts.
+- [x] Add `test/harness.ts` using `createGasLoader` with `loadOrderFiles`.
 - [ ] Add `test/mocks.ts` for `HtmlService`, `ContentService`, `CacheService`, `LockService`, `Session` and `Utilities`, in the sibling libraries' style.
 - [ ] Unit smoke tests: both entry points, both transports, one success and one error each. No router characterisation tests: Phase 4 replaces that behaviour.
 - [ ] Add `gas-test/tsconfig.json` and `gasDevConfig.gasTest.scopes` for the services under test (at least `userinfo.email`).
@@ -342,9 +344,9 @@ Branch: `feature/transport`. Closes X2, X6 (client side), X8, C4.
 
 Branch: `feature/gas-dev-release`. Closes T2, T4.
 
-- [ ] Add gas-dev-release (`^1.1.0`) and `"release": "gas-dev-release"`.
-- [ ] `gasDevRelease.targets`: `dist` (backend, `web/` excluded) and `dist-web` (from `dist/web`, with `src/web/README.md` as its README), both with `packageJson: true`.
-- [ ] Delete `scripts/release.sh` and `scripts/write-release-package-json.js`.
+- [x] Add gas-dev-release (`^1.1.0`) and `"release": "gas-dev-release"`.
+- [x] `gasDevRelease.targets`: `dist` (backend, `web/` excluded) and `dist-web` (from `dist/web`, with `src/web/README.md` as its README), both with `packageJson: true`.
+- [x] Delete `scripts/release.sh` and `scripts/write-release-package-json.js`.
 - [ ] Add `peer/gas-webapp.peer.types.d.ts` as the canonical declaration for downstream gas-\* libraries.
 - [ ] Reduce `scripts/sync-gas-webapp.sh` to the browser client; document gas-dev-bundle for the backend and its peers (P6, P7).
 - [ ] `npm run release -- --dry-run` stages both targets with `v`-prefixed tags.
