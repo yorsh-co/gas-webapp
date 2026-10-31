@@ -716,7 +716,8 @@ These are Apps Script constraints. They are documented, not fixed.
 
 Observed on a deployed web app (`manual/` fixture):
 
-- **`e.pathInfo`.** A signed-in GET to `/exec/users/42` runs with `pathInfo` `"users/42"`; with `?route=/users/42` also present, `route` wins. An anonymous GET with a path never reaches the script. An anonymous POST to `/exec/echo?route=/echo` runs with `pathInfo` `"echo"`, and an anonymous POST to `/exec/echo` reaches `doPost`. A signed-in POST with a path is not yet confirmed.
+- **`e.pathInfo`.** A signed-in GET to `/exec/users/42` runs with `pathInfo` `"users/42"`; with `?route=/users/42` also present, `route` wins. An anonymous GET with a path never reaches the script. An anonymous POST to `/exec/echo?route=/echo` runs with `pathInfo` `"echo"`, and an anonymous POST to `/exec/echo` reaches `doPost`. A signed-in POST (an HTML form) to `/exec/echo` runs with `pathInfo` `"echo"`, so path URLs reach `doPost` whether or not the caller is signed in.
+- **`google.script.run`.** The event the client sends carries no `pathInfo` or `contextPath`, and `undefined` values (such as `body` on a GET) arrive in the browser as `null`. The `callId` the client adds for delivery acknowledgement appears in `req.query`.
 - **Trailing slash.** `/exec/` is answered by Apps Script's own 404 page; the script does not run.
 - **`e.contextPath`** is `""` on GET and POST.
 - **Response types.** A JSON response is a 302 (`application/binary`) to `script.googleusercontent.com/macros/echo...`, then a 200 `application/json; charset=utf-8`. An `HtmlService` response is a 200 `text/html; charset=utf-8` served directly from `script.google.com`, with the page content inside `HtmlService`'s sandboxed iframe.
