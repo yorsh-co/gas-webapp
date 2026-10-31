@@ -58,8 +58,8 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 
 ### Changed
 
-- Prettier, TypeScript and ESLint configuration come from [`gas-dev-config`](https://github.com/yorsh-co/gas-dev-config); the backend compiles to ES2020, as Apps Script rejects newer syntax on push
-- `async` functions and `await` are lint errors in the backend sources
+- Prettier, TypeScript and ESLint configuration come from [`gas-dev-config`](https://github.com/yorsh-co/gas-dev-config) `^1.5.0`; the backend compiles to ES2020, as Apps Script rejects newer syntax on push
+- `async` functions and `await` are lint errors in the backend sources, through the gas-dev-config 1.5 `gas` preset
 - `gasDevConfig` in `package.json` declares the load order and the `gas-error`, `gas-logger` and `gas-lock` peers
 - `src/internal/` holds the canonical `peer/*.d.ts` files of `gas-error`, `gas-logger` and `gas-lock`
 - Failed requests are resolved into the response as the router stack finishes, so middleware reading `res.statusCode` after `next()` sees the error status (404, 500...) instead of 200; the error is logged once, by `GasError.handle`
