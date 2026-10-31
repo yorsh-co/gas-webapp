@@ -1,4 +1,13 @@
 const RATE_LIMITER_LOCK_TIMEOUT_MS = 10000;
+const CONCURRENCY_LOCK_TIMEOUT_MS = 3000;
+/** Longer wait for the one retry of a contended slot release. */
+const CONCURRENCY_RELEASE_RETRY_TIMEOUT_MS = 10000;
+/**
+ * Safety TTL of a concurrency counter. Apps Script executions are capped at
+ * 6 minutes, so a slot must outlive the longest possible request; the margin
+ * covers clock skew and the final release.
+ */
+const CONCURRENCY_COUNTER_TTL_SECONDS = 6 * 60 + 60;
 
 /**
  * Used when a limiter isn't given a lockService — resolves LockService
@@ -63,18 +72,27 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
 
 /**
  * Caps simultaneous in-flight requests rather than requests-per-window.
- * The counter carries a short safety TTL so a crashed execution that
- * never reaches the `finally` release doesn't permanently hold a slot.
+ * The counter carries a safety TTL covering the 6-minute execution limit, so
+ * a crashed execution that never reaches the `finally` release doesn't
+ * permanently hold a slot. A contended release is retried once before the
+ * slot is left to expire.
  */
 const createConcurrencyLimiter = (
   config: ConcurrencyLimitConfig,
 ): Middleware => {
+  const lockService = config.lockService ?? GAS_WEBAPP_DEFAULT_LOCK_SERVICE;
+
   const adjust = (
     key: string,
-    lock: GoogleAppsScript.Lock.Lock,
+    lock: GoogleAppsScript.Lock.Lock | null,
     delta: number,
   ): number => {
-    if (!lock || !lock.tryLock(3000)) {
+    const timeouts =
+      delta > 0
+        ? [CONCURRENCY_LOCK_TIMEOUT_MS]
+        : [CONCURRENCY_LOCK_TIMEOUT_MS, CONCURRENCY_RELEASE_RETRY_TIMEOUT_MS];
+
+    if (!lock || !timeouts.some((timeoutMs) => lock.tryLock(timeoutMs))) {
       if (delta > 0) throw new GasRateLimitError('Concurrency limiter busy');
       return -1; // best-effort release on contention — don't fail the response for this
     }
@@ -82,7 +100,7 @@ const createConcurrencyLimiter = (
       const cache = CacheService.getScriptCache();
       const current = Number(cache.get(key) || '0');
       const next = Math.max(0, current + delta);
-      cache.put(key, String(next), 60);
+      cache.put(key, String(next), CONCURRENCY_COUNTER_TTL_SECONDS);
       return next;
     } finally {
       lock.releaseLock();
@@ -92,10 +110,7 @@ const createConcurrencyLimiter = (
   return (next: Handler): Handler =>
     (request: RouteRequest) => {
       const key = `concurrency:${config.keyFn(request)}`;
-      const lock =
-        config.lockScope === 'user'
-          ? LockService.getUserLock()
-          : LockService.getScriptLock();
+      const lock = lockService.getLock(config.lockScope);
 
       const after = adjust(key, lock, +1);
       if (after > config.limit) {

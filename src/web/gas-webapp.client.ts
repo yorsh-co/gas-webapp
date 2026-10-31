@@ -27,6 +27,9 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
 (function (api: GasWebAppApi) {
   'use strict';
 
+  /** Event parameters the client sets itself; `options.params` may not use them. */
+  const RESERVED_PARAMS = ['route', 'callId'];
+
   /**
    * Read per call, never captured: `configure()` runs after this file loads,
    * and mutates the same object in place.
@@ -219,7 +222,7 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
 
       const chained = runner
         .withSuccessHandler((value: unknown) =>
-          settle(() => resolve((value as SuccessPayload<T>).data)),
+          settle(() => resolve((value as SuccessPayload<T> | null)?.data as T)),
         )
         .withFailureHandler((err: unknown) =>
           settle(() => {
@@ -296,6 +299,17 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     route: string,
     options: ApiRequestOptions = {},
   ): Promise<T> {
+    const reservedKey = RESERVED_PARAMS.find(
+      (key) =>
+        options.params &&
+        Object.prototype.hasOwnProperty.call(options.params, key),
+    );
+    if (reservedKey) {
+      throw window.GasWebApp.errors.clientError(
+        new Error(`params.${reservedKey} is reserved by the client`),
+      );
+    }
+
     const scope = options.scope ?? `${method} ${route}`;
     const retries =
       options.retries ?? (method === 'GET' ? config().getRetries : 0);
@@ -304,7 +318,10 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
       try {
         return await attempt<T>(method, route, options);
       } catch (err) {
-        const error = err as IServerError;
+        const error =
+          err instanceof window.GasWebApp.errors.ServerError
+            ? err
+            : window.GasWebApp.errors.clientError(err);
         const delay = retryDelayMs(error.payload, attemptIndex);
 
         if (

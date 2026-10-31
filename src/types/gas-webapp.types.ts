@@ -29,8 +29,8 @@ interface GasWebAppConfig {
 }
 
 interface RenderOptions {
-  /** Set to null to render the view standalone with no layout. */
-  layout: string | null;
+  /** Layout to inject the view into. Omit or set to null to render standalone. */
+  layout?: string | null;
   [key: string]: unknown;
 }
 

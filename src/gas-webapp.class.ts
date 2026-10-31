@@ -58,24 +58,26 @@ class GasWebApp extends GasWebAppRouter {
   }
 
   /**
-   * Render a view, optionally injected into a layout.
-   * Pass `layout: null` to render the view standalone.
+   * Render a view, optionally injected into a layout. Both names are resolved
+   * against the configured `html` static dir, like `html()`. Omit `layout`, or
+   * pass `null`, to render the view standalone.
    */
-  render(
-    viewName: string,
-    options: RenderOptions = {} as RenderOptions,
-  ): HtmlResponse {
+  render(viewName: string, options: RenderOptions = {}): HtmlResponse {
     const { layout, ...data } = options;
 
-    const viewTemplate = HtmlService.createTemplateFromFile(viewName);
+    const viewTemplate = HtmlService.createTemplateFromFile(
+      this.resolveStaticFilePath('html', viewName),
+    );
     Object.assign(viewTemplate, data);
     const body = viewTemplate.evaluate().getContent();
 
-    if (layout === null) {
+    if (layout == null) {
       return new HtmlResponse(HtmlService.createHtmlOutput(body));
     }
 
-    const layoutTemplate = HtmlService.createTemplateFromFile(layout);
+    const layoutTemplate = HtmlService.createTemplateFromFile(
+      this.resolveStaticFilePath('html', layout),
+    );
     Object.assign(layoutTemplate, data, { body });
 
     return new HtmlResponse(layoutTemplate.evaluate());
@@ -115,14 +117,15 @@ class GasWebApp extends GasWebAppRouter {
     return this.include(this.resolveStaticFilePath('html', filePath), data);
   }
 
-  /** Resolve a logical static path to its full file path, per the configured dirs/extensions. */
+  /**
+   * Resolve a logical static path to its full file path, per the configured
+   * dirs/extensions. Surrounding whitespace and leading slashes are ignored,
+   * so `'app'` and `'/app'` resolve alike.
+   */
   resolveStaticFilePath(fileType: StaticFileType, path: string): string {
-    let cleanPath = path.trim();
-    cleanPath += cleanPath.startsWith('/') ? '' : '/';
+    const cleanPath = path.trim().replace(/^\/+/, '');
 
-    return (
-      this._staticDirs[fileType] + cleanPath + this._staticExtensions[fileType]
-    );
+    return `${this._staticDirs[fileType]}/${cleanPath}${this._staticExtensions[fileType]}`;
   }
 
   // =========================
@@ -133,18 +136,54 @@ class GasWebApp extends GasWebAppRouter {
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
     method: HttpMethod,
   ): WebAppResponse {
-    const request = this._normalizeRequest(e, method);
+    const isHttpRequest = this._isHttpRequest(e);
+    let request: RouteRequest | undefined;
 
     try {
-      const response = this._dispatch(request);
-      return this._serialize(response, request.isHttpRequest);
+      request = this._normalizeRequest(e, method);
+      return this._serialize(this._dispatch(request), isHttpRequest);
     } catch (err) {
-      if (!request.isHttpRequest) throw err;
-
-      return ContentService.createTextOutput(
-        (err as Error).message,
-      ).setMimeType(ContentService.MimeType.JSON);
+      return this._fail(err, e, method, isHttpRequest, request);
     }
+  }
+
+  /** A real web app request carries `contextPath`; `google.script.run` calls do not. */
+  private _isHttpRequest(
+    e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
+  ): boolean {
+    return (
+      e !== undefined &&
+      e !== null &&
+      (e as GoogleAppsScript.Events.DoGet).contextPath !== undefined
+    );
+  }
+
+  /**
+   * The single error path: logs through `GasError.handle`, then rethrows the
+   * JSON envelope to RPC callers or returns it as JSON text output to HTTP
+   * callers.
+   */
+  private _fail(
+    err: unknown,
+    e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
+    method: HttpMethod,
+    isHttpRequest: boolean,
+    request?: RouteRequest,
+  ): WebAppResponse {
+    const context = {
+      logger: this._logger,
+      method,
+      path: request?.route ?? e?.parameter?.route ?? '',
+      sessionId: request?.email || '',
+    };
+
+    if (!isHttpRequest) return GasError.handle(err, context);
+
+    const payload = GasError.handle(err, { ...context, rethrow: false });
+
+    return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(
+      ContentService.MimeType.JSON,
+    );
   }
 
   private _normalizeRequest(
@@ -152,53 +191,61 @@ class GasWebApp extends GasWebAppRouter {
     method: HttpMethod,
   ): RouteRequest {
     const params = (e && e.parameter) || {};
-    let body: unknown;
+    const body =
+      method === 'POST'
+        ? this._parseBody((e as GoogleAppsScript.Events.DoPost).postData)
+        : undefined;
 
-    if (method === 'POST') {
-      const postData = (e as GoogleAppsScript.Events.DoPost).postData;
-
-      if (postData && postData.contents) {
-        try {
-          body = JSON.parse(postData.contents);
-        } catch {
-          throw new GasValidationError('Invalid JSON body');
-        }
-      }
-    }
-
-    const isHttpRequest =
-      e && (e as GoogleAppsScript.Events.DoGet).contextPath !== undefined;
-
-    const normalized = {
+    return {
       route: params.route || '/',
       method,
-      isHttpRequest,
+      isHttpRequest: this._isHttpRequest(e),
       reqId: Utilities.getUuid(),
       params,
       body,
       raw: e,
     };
+  }
 
-    return normalized;
+  /**
+   * Parse a POST body by its content type: JSON is parsed, form encodings are
+   * left to `e.parameter`, anything else is kept as the raw string.
+   *
+   * @throws {GasValidationError} When a JSON body is malformed.
+   */
+  private _parseBody(
+    postData: GoogleAppsScript.Events.DoPost['postData'] | undefined,
+  ): unknown {
+    if (!postData || !postData.contents) return undefined;
+
+    const type = (postData.type || '').split(';')[0]?.trim().toLowerCase();
+
+    if (type === 'application/json') {
+      try {
+        return JSON.parse(postData.contents);
+      } catch {
+        throw new GasValidationError('Invalid JSON body');
+      }
+    }
+
+    if (
+      type === 'application/x-www-form-urlencoded' ||
+      type === 'multipart/form-data'
+    ) {
+      return undefined;
+    }
+
+    return postData.contents;
   }
 
   private _dispatch(request: RouteRequest): AppResponse {
-    try {
-      const result = super.dispatch(request);
+    const result = super.dispatch(request);
 
-      if (result instanceof JsonResponse || result instanceof HtmlResponse) {
-        return result;
-      }
-
-      return this.json(result);
-    } catch (err) {
-      return GasError.handle(err, {
-        logger: this._logger,
-        method: request.method,
-        path: request.route || '',
-        sessionId: request.email || '',
-      });
+    if (result instanceof JsonResponse || result instanceof HtmlResponse) {
+      return result;
     }
+
+    return this.json(result);
   }
 
   private _serialize(
