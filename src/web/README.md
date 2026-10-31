@@ -9,7 +9,8 @@ Ships from the same repository on a separate `dist-web` release branch, since `g
 
 ### Features
 
-- `GasWebApp.api.get`/`.post` — promisified wrappers around `google.script.run.doGet`/`doPost`, resolving with the unwrapped response data
+- `GasWebApp.api.get`/`.post`/`.put`/`.patch`/`.delete` — promisified wrappers around `google.script.run.doGet`/`doPost`, resolving with the unwrapped response data. PUT, PATCH and DELETE travel as a POST carrying `_method`
+- Optional idempotency keys, so a write can be retried safely against the backend's `createIdempotencyGuard`
 - Per-call timeout, since `google.script.run` has no cancel API of its own
 - Automatic retry on transient failures (`429`, `5xx`), honoring the server's `details.retryAfterSeconds` when the router's rate limiter supplies one
 - Delivery acknowledgement — detects a `google.script.run` call that never reached the server (a silent drop, not a slow response) and fails it distinctly, so it can be retried instead of waiting out the full timeout
@@ -57,19 +58,19 @@ window.GasWebApp.configure({
 
 Optional, and every field is. Without it, the client logs its own warnings and errors to `console` and runs on the defaults below.
 
-| Option              | Default                     | Purpose                                                |
-| ------------------- | --------------------------- | ------------------------------------------------------ |
-| `logger`            | `console` (warn and above)  | Where the client sends its own diagnostics             |
-| `timeoutMs`         | `30000`                     | Per-call deadline, unless overridden per request       |
-| `getRetries`        | `2`                         | Retries after the first attempt; GET only              |
-| `retryBaseMs`       | `400`                       | First backoff window; doubles each attempt             |
-| `maxRetryDelayMs`   | `15000`                     | Past this, the retry is abandoned                      |
-| `retryableStatuses` | `[429, 500, 502, 503, 504]` | Statuses worth a second attempt                        |
-| `ackRoute`          | `'/ack'`                    | Where the backend mounts `ack.handler`                 |
-| `ackPollIntervalMs` | `2000`                      | Gap between ack polls                                  |
-| `ackPollTimeoutMs`  | `5000`                      | Deadline for the ack poll itself                       |
-| `ackDeadlineMs`     | `15000`                     | Unacknowledged past this, a call counts as undelivered |
-| `ackScope`          | `'Ack Watcher'`             | Logger scope for ack diagnostics                       |
+| Option              | Default                     | Purpose                                                                     |
+| ------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `logger`            | `console` (warn and above)  | Where the client sends its own diagnostics                                  |
+| `timeoutMs`         | `30000`                     | Per-call deadline, unless overridden per request                            |
+| `getRetries`        | `2`                         | Retries after the first attempt; GET, or a request with an `idempotencyKey` |
+| `retryBaseMs`       | `400`                       | First backoff window; doubles each attempt                                  |
+| `maxRetryDelayMs`   | `15000`                     | Past this, the retry is abandoned                                           |
+| `retryableStatuses` | `[429, 500, 502, 503, 504]` | Statuses worth a second attempt                                             |
+| `ackRoute`          | `'/ack'`                    | Where the backend mounts `ack.handler`                                      |
+| `ackPollIntervalMs` | `2000`                      | Gap between ack polls                                                       |
+| `ackPollTimeoutMs`  | `5000`                      | Deadline for the ack poll itself                                            |
+| `ackDeadlineMs`     | `15000`                     | Unacknowledged past this, a call counts as undelivered                      |
+| `ackScope`          | `'Ack Watcher'`             | Logger scope for ack diagnostics                                            |
 
 Call it once at boot. Values are read live on each request, so it only has to run before the first call.
 
@@ -93,18 +94,36 @@ try {
 }
 ```
 
+```js
+await window.GasWebApp.api.put('/api/users/42', { name: 'Ada' });
+await window.GasWebApp.api.patch('/api/users/42', { name: 'Ada' });
+await window.GasWebApp.api.delete('/api/users/42');
+```
+
 > **Note:**
-> `get` retries transient failures twice by default; `post` does not retry at all, since a timed-out or `5xx` POST may already have committed server-side. Pass `{ retries: n }` to override — only do this for a POST route that's idempotent or carries its own idempotency key.
+> `get` retries transient failures twice by default; `post`, `put`, `patch` and `delete` do not retry at all, since a timed-out or `5xx` write may already have committed server-side. Pass `{ retries: n }` to override — only do this for a route that's idempotent or carries its own idempotency key.
+
+### Idempotency keys
+
+```js
+await window.GasWebApp.api.post('/api/orders', order, { idempotencyKey: true });
+```
+
+`idempotencyKey: true` generates one UUID per logical request and reuses it on every retry attempt; pass a UUID string to supply your own. The key is sent as the reserved `idempotencyKey` parameter, which the backend's [`createIdempotencyGuard`](../README.md#idempotency) turns into run-once, replay-after semantics. A request with a key retries like a GET (`getRetries`) unless `retries` is set.
+
+> **Note:**
+> `NOT_DELIVERED` can be a false negative. A call queued behind Apps Script's per-user concurrent execution limit for longer than `ackDeadlineMs` is reported as never delivered, and then runs. A retry without an idempotency key would commit the write twice. Use a key on every write you retry.
 
 ### Options
 
-| Option      | Default                    | Notes                                                                                                                                |
-| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `params`    | `{}`                       | Merged into the request alongside `route`. Values must be strings. `route` and `callId` are reserved and reject with `CLIENT_ERROR`. |
-| `body`      | —                          | POST only, JSON-serialized.                                                                                                          |
-| `timeoutMs` | `30000`                    | Client-side deadline. The server call keeps running past it regardless.                                                              |
-| `retries`   | `2` for GET, `0` for POST  | Attempts after the first, on `429`/`5xx` responses.                                                                                  |
-| `scope`     | `` `${method} ${route}` `` | Logger scope for failures.                                                                                                           |
+| Option           | Default                                         | Notes                                                                                                                                                             |
+| ---------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `params`         | `{}`                                            | Merged into the request alongside `route`. Values must be strings. `route`, `callId`, `_method` and `idempotencyKey` are reserved and reject with `CLIENT_ERROR`. |
+| `body`           | —                                               | Not sent on GET, JSON-serialized.                                                                                                                                 |
+| `timeoutMs`      | `30000`                                         | Client-side deadline. The server call keeps running past it regardless.                                                                                           |
+| `retries`        | `2` for GET or with a key, `0` for other writes | Attempts after the first, on `429`/`5xx` responses.                                                                                                               |
+| `idempotencyKey` | —                                               | `true` for a generated UUID, reused across retries, or your own UUID string.                                                                                      |
+| `scope`          | `` `${method} ${route}` ``                      | Logger scope for failures.                                                                                                                                        |
 
 ## License
 

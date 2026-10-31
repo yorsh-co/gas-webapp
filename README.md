@@ -336,17 +336,29 @@ PUT, PATCH and DELETE reach `doPost` as a POST carrying `_method=PUT|PATCH|DELET
 
 ### Route requests from the client
 
-Both transports read the target route from a `route` parameter, since `doPost` has no URL path to inspect:
+The target route is resolved per entry point:
+
+| Entry point | Resolution order                     |
+| ----------- | ------------------------------------ |
+| `doGet`     | `route` parameter, `e.pathInfo`, `/` |
+| `doPost`    | `route` parameter, `/`               |
+
+- `google.script.run` callers always send `route`.
+- When a GET carries both, `route` wins silently.
+- `e.pathInfo` is unreliable on `doPost`, so it is never read there: Express-style links (`/exec/users/42`) work for pages and GET APIs, and HTTP POSTs must use `?route=`. Apps Script delivers `pathInfo` without a leading slash; it is normalised like any other path.
 
 ```js
 // Real HTTP request
 fetch(`${webAppUrl}?route=/api/users`);
+fetch(`${webAppUrl}/api/users`); // GET only, through e.pathInfo
 
 // google.script.run
 google.script.run
   .withSuccessHandler(onUsers)
   .doGet({ parameter: { route: '/api/users' } });
 ```
+
+PUT, PATCH and DELETE are POSTs carrying `_method` (`POST ${webAppUrl}?route=/api/users/42&_method=DELETE`).
 
 > **Note:**
 > That's the raw shape either transport expects. If you'd rather not hand-roll the promise wrapping, retry, and error parsing yourself, the [browser client](./web/README.md) does this for you: `GasWebApp.api.get('/api/users')`.
@@ -451,7 +463,24 @@ webApp.use(
 `ackTracker.handler` expects a `callIds` parameter (comma-separated) and responds with the subset that were found — each one is deleted from the cache as it's reported, so a given `callId` is only ever reported once.
 
 > **Note:**
+> `NOT_DELIVERED` is a strong hint, not proof. A call queued behind Apps Script's per-user concurrent execution limit for longer than the client's `ackDeadlineMs` is reported as dropped and then runs, so the caller sees an error while the write commits. For routes where a double write matters, pair retries with [`createIdempotencyGuard`](#idempotency).
+
+> **Note:**
 > `callId` is a correlation token, not a credential. It's never used for authorization, and because it's client-supplied it's validated against a UUID pattern before it's used as a cache key. Treat it as a hint that a request arrived, not proof of anything about who sent it.
+
+### Idempotency
+
+`createIdempotencyGuard` makes a mutating route safe to retry. A request carrying an `idempotencyKey` parameter (a UUID, which the [browser client](./web/README.md) sends for `idempotencyKey: true`) runs once: its success envelope is stored in `CacheService` and replayed to every later request with the same key, and a duplicate arriving while the first is still running is a 409.
+
+```js
+webApp.use('/api', createAuthMiddleware({ isAuthorized }));
+webApp.use('/api', createIdempotencyGuard()); // { ttlSeconds: 21600, lockService, lockScope: 'user' }
+```
+
+- Register it after auth: the key is then scoped to `req.user.email`, so two users' keys cannot collide. Without a user the key is global to the script.
+- A failed request (an error status or a thrown error) clears its key, so the retry runs. Only JSON responses are stored; a view or text output clears the key too, as does a response over `CacheService`'s 100 KB value limit.
+- The key is checked and marked under the lock (`lockScope`, `'user'` by default), but the handler itself runs outside it. An invalid key is a 400.
+- Replay lasts `ttlSeconds`, at most 21600 (6 hours, the `CacheService` maximum). An in-flight marker expires after 7 minutes if its execution died.
 
 ### Mount a Sub-Router
 
@@ -485,6 +514,8 @@ Data for `render` comes from three levels, later ones winning: `webApp.locals` (
 
 `render` resolves both the view and the layout through the configured `html` static dir, exactly like `webApp.html()` — `'Home'` becomes `dist/web/views/Home.html` by default — so pass logical names, not full paths. Omit `layout`, or pass `layout: null`, to render the view standalone. Rendering works only over a real HTTP request; over `google.script.run` it throws `GasForbiddenError`.
 
+`req.transport` is **advisory**. It is inferred from the presence of `contextPath` on the event, and a `google.script.run` caller controls the whole event object, so it can claim either value. It selects the output format and the `render`/`redirect` refusals, and must never drive an authentication, authorization or other security decision.
+
 ### Template Helpers
 
 Call these from inside an `HtmlService` template via the app's global instance:
@@ -502,7 +533,7 @@ Each resolves against the configured `static` dirs/extensions — e.g. `webApp.j
 
 ### Request Lifecycle
 
-1. `doGet`/`doPost` normalizes the raw event into a `req` (`method`, `path`, `query`, `body`, a generated `id`, and the `transport`: a real `'http'` request or a `google.script.run` `'rpc'` call). The route comes from the `route` parameter. A POST body is parsed by its `postData.type`: `application/json` (parameters such as `; charset=utf-8` allowed) is parsed, and a malformed body is a 400; `application/x-www-form-urlencoded` and `multipart/form-data` leave `req.body` undefined, as their fields are in `req.query`; any other type is passed through as the raw string.
+1. `doGet`/`doPost` normalizes the raw event into a `req` (`method`, `path`, `query`, `body`, a generated `id`, and the `transport`: a real `'http'` request or a `google.script.run` `'rpc'` call). The route is resolved as in [Route requests from the client](#route-requests-from-the-client). A POST body is parsed by its `postData.type`: `application/json` (parameters such as `; charset=utf-8` allowed) is parsed, and a malformed body is a 400; `application/x-www-form-urlencoded` and `multipart/form-data` leave `req.body` undefined, as their fields are in `req.query`; any other type is passed through as the raw string.
 2. The request runs through the router's layer stack in registration order.
 3. The response is serialized: real HTTP requests get a `ContentService`/`HtmlService` output; `google.script.run` calls get the plain payload.
 

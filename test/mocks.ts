@@ -116,6 +116,9 @@ export function createMocks(options: MockOptions = {}) {
       }
       return found;
     }),
+    remove: vi.fn((key: string) => {
+      cacheStore.delete(key);
+    }),
     removeAll: vi.fn((keys: string[]) => {
       for (const key of keys) cacheStore.delete(key);
     }),

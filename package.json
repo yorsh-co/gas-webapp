@@ -65,6 +65,7 @@
       "middleware/gas-webapp.ack.ts",
       "middleware/gas-webapp.auth.ts",
       "middleware/gas-webapp.limiter.ts",
+      "middleware/gas-webapp.idempotency.ts",
       "middleware/gas-webapp.logging.ts"
     ],
     "peers": {

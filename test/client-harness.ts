@@ -10,6 +10,9 @@ export interface ClientNamespace {
   api: {
     get(route: string, options?: object): Promise<unknown>;
     post(route: string, body?: unknown, options?: object): Promise<unknown>;
+    put(route: string, body?: unknown, options?: object): Promise<unknown>;
+    patch(route: string, body?: unknown, options?: object): Promise<unknown>;
+    delete(route: string, options?: object): Promise<unknown>;
   };
   errors: { ServerError: new (payload: object) => Error };
 }
@@ -40,10 +43,16 @@ export function loadClient(
   randomUUID: () => string = () => crypto.randomUUID(),
 ) {
   const events: object[] = [];
+  const entries: string[] = [];
   const dispatch =
-    (success: (v: unknown) => void, failure: (e: unknown) => void) =>
+    (
+      success: (v: unknown) => void,
+      failure: (e: unknown) => void,
+      entry: string,
+    ) =>
     (event: object) => {
       events.push(event);
+      entries.push(entry);
       behavior(event, { success, failure });
     };
 
@@ -54,8 +63,8 @@ export function loadClient(
       const run = {
         withSuccessHandler: (fn: typeof success) => ((success = fn), run),
         withFailureHandler: (fn: typeof failure) => ((failure = fn), run),
-        doGet: (event: object) => dispatch(success, failure)(event),
-        doPost: (event: object) => dispatch(success, failure)(event),
+        doGet: (event: object) => dispatch(success, failure, 'doGet')(event),
+        doPost: (event: object) => dispatch(success, failure, 'doPost')(event),
       };
       return { script: { run } };
     },
@@ -70,5 +79,5 @@ export function loadClient(
     Error,
   });
 
-  return { client: window.GasWebApp, events };
+  return { client: window.GasWebApp, events, entries };
 }

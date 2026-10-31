@@ -29,7 +29,8 @@ interface GasErrorPayload {
 /**
  * The subset of `Events.DoGet`/`DoPost` the router reads, as synthesized by the
  * client. `contextPath` is deliberately absent — the router uses its presence
- * to tell a real HTTP request from a `google.script.run` call.
+ * to tell a real HTTP request from a `google.script.run` call (advisory only:
+ * a caller can forge it).
  */
 interface SimulatedEvent {
   parameter: Record<string, string>;
