@@ -67,6 +67,7 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 - The concurrency limiter's counter TTL is 420 s, covering the 6-minute execution limit, instead of 60 s
 - Documented that `req.transport` is advisory (a `google.script.run` caller controls the whole event, including `contextPath`) and must not drive security decisions, and that `NOT_DELIVERED` can be a false negative when a call is queued past `ackDeadlineMs` and then runs
 - Both READMEs rewritten for the new API, with Express differences, platform limitations and the file push order reduced to what still applies
+- The package description matches the README and GitHub: "Express-style router and middleware for Google Apps Script web apps."
 
 ### Fixed
 
