@@ -687,7 +687,7 @@ app.use(createLoggingMiddleware(gasLogger, { redact: ['token', 'ssn'] }));
 - **Synchronous only.** Apps Script rejects `async` and `await` on push (P8), and `doGet`/`doPost` must return synchronously. `next()` is a plain synchronous call, and there is no async middleware. The browser client runs in the browser and keeps its `async`/`await`.
 - **Always HTTP 200.** The status exists only in the envelope (P1). Clients must read `ok`/`status`, not the HTTP status.
 - **No headers or cookies.** There is no `res.set`, `res.cookie` or `req.headers`, and `Content-Type` is chosen by the output type (P2).
-- **`render` and `redirect` are HTTP-only.** `google.script.run` cannot carry HTML or navigate, so both throw `GasForbiddenError` over RPC. `redirect` is a top-window navigation of an HTML page, not an HTTP redirect, and browsers commonly block it (P9).
+- **`render` and `redirect` are HTTP-only.** `google.script.run` cannot carry HTML or navigate, so both throw `GasForbiddenError` over RPC. `redirect` is a top-window navigation of an HTML page, not an HTTP redirect, and browsers block the automatic navigation, so the user has to click its link (P9).
 - **A wrong method is a 404,** not a 405: `gas-error` has no 405.
 - **Return values are ignored.** A route responds only through `res`.
 - **PUT, PATCH and DELETE are POSTs** with `_method`.
@@ -709,7 +709,7 @@ These are Apps Script constraints. They are documented, not fixed.
 | P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                                          |
 | P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                                                |
 | P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gas-dev-config` forbids them in Apps Script sources.                           |
-| P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which browsers commonly block. The fallback link is the reliable path.                                            |
+| P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which every tested browser blocks without a click. The user follows the page's link.                              |
 | P10 | An entry-point alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`; declare `doGet`/`doPost` as functions (see [Export the entry points](#export-the-entry-points)). |
 
 ### Platform notes
@@ -721,7 +721,7 @@ Observed on a deployed web app (`manual/` fixture):
 - **Trailing slash.** `/exec/` is answered by Apps Script's own 404 page; the script does not run.
 - **`e.contextPath`** is `""` on GET and POST.
 - **Response types.** A JSON response is a 302 (`application/binary`) to `script.googleusercontent.com/macros/echo...`, then a 200 `application/json; charset=utf-8`. An `HtmlService` response is a 200 `text/html; charset=utf-8` served directly from `script.google.com`, with the page content inside `HtmlService`'s sandboxed iframe.
-- **`res.redirect`.** Automatic top-window navigation is commonly blocked in `HtmlService`'s sandbox: on Android Firefox the fallback link had to be clicked, and Android Chrome showed a "redirect blocked" popup. The fallback link is the reliable path. Desktop is untested.
+- **`res.redirect`.** Automatic top-window navigation from `HtmlService`'s sandbox is blocked in every browser tested: desktop Firefox (Zen) and Chromium (Helium), and Android Firefox all needed the link to be clicked, and Android Chrome showed a "redirect blocked" popup. Treat the page's link as the redirect.
 - **Entry points.** `const doGet = app.doGet` works for HTTP but not for `google.script.run`.
 
 ## Development

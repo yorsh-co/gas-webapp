@@ -378,7 +378,7 @@ Branch: `feature/docs-v1`. Closes T3, T5.
 
 ## Outstanding manual steps
 
-1. Optional: check `res.redirect` (check 17) on desktop browsers and record the result in the README's platform notes (P9). Every other manual check passed and is recorded there.
+1. Delete the manual fixture's deployment and `.manual-webapp/`. Every manual check passed and is recorded in the README's platform notes.
 2. Release gas-dev-config 1.5.0, then bump it here to `^1.5.0` and remove the mirrored `async`/`await` rule from `eslint.config.js`.
 3. Cut `release/1.0.0`: version bump, git-flow release, `npm run build:release`, and push the branches and tags.
 4. Delete this document.
