@@ -14,7 +14,7 @@ interface SuccessPayload<T = unknown> {
 }
 
 /**
- * Error envelope serialized by `gas-error`'s `errorHandler`. Mirrored here
+ * Error envelope serialized by `gas-error`'s `GasError.handle`. Mirrored here
  * because gas-webapp is what puts it on the wire; gas-error remains its owner.
  */
 interface GasErrorPayload {

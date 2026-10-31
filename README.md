@@ -65,11 +65,11 @@ const doPost = webApp.doPost;
 
 `gas-webapp` expects the following as globals at runtime — both are separate subtree packages, added the same way as `gas-webapp` itself.
 
-| Package                                                | Required | Used for                                                                                                                   |
-| ------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [`gas-error`](https://github.com/yorsh-co/gas-error)   | Yes      | `NotFoundError`, `ForbiddenError`, `ValidationError`, `UnauthorizedError`, `RateLimitError`, `errorHandler`                |
-| [`gas-logger`](https://github.com/yorsh-co/gas-logger) | No       | Structured request logging via `createLoggingMiddleware`; falls back to `console` if omitted                               |
-| [`gas-lock`](https://github.com/yorsh-co/gas-lock)     | No       | Optional `lockService` for `createRateLimiter`/`createConcurrencyLimiter`; falls back to `LockService` directly if omitted |
+| Package                                                | Required | Used for                                                                                                                      |
+| ------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`gas-error`](https://github.com/yorsh-co/gas-error)   | Yes      | `GasError.handle`, `GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError` |
+| [`gas-logger`](https://github.com/yorsh-co/gas-logger) | No       | Structured request logging via `createLoggingMiddleware`; falls back to `console` if omitted                                  |
+| [`gas-lock`](https://github.com/yorsh-co/gas-lock)     | No       | Optional `lockService` for `createRateLimiter`/`createConcurrencyLimiter`; falls back to `LockService` directly if omitted    |
 
 ### Deployment
 
@@ -351,7 +351,7 @@ webApp.post(
 ```
 
 > **Note:**
-> When `createRateLimiter` rejects a request for exceeding the window count, the `RateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
+> When `createRateLimiter` rejects a request for exceeding the window count, the `GasRateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
 
 ### Sharing a lock registry
 
@@ -461,7 +461,7 @@ Each resolves against the configured `static` dirs/extensions — e.g. `webApp.j
 
 ### Error Handling
 
-Handlers and middleware can throw any `GasError` subclass (`NotFoundError`, `ForbiddenError`, `ValidationError`, `UnauthorizedError`, `RateLimitError`, from the `gas-error` peer package). `GasWebApp` catches these via `errorHandler` and serializes them consistently instead of letting them crash the request — for both transports.
+Handlers and middleware can throw any `GasError` subclass (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`, from the `gas-error` peer package). `GasWebApp` catches these via `GasError.handle` and serializes them consistently instead of letting them crash the request — for both transports.
 
 ### Middleware Execution Order
 
@@ -472,7 +472,7 @@ Handlers and middleware can throw any `GasError` subclass (`NotFoundError`, `For
 
 ### Dual Transport
 
-Every route works over both a real HTTP request and `google.script.run`, using the same handler. `HtmlResponse` results (from `render`) can only be returned over a real HTTP request — returning one from a `google.script.run` call throws `ForbiddenError`.
+Every route works over both a real HTTP request and `google.script.run`, using the same handler. `HtmlResponse` results (from `render`) can only be returned over a real HTTP request — returning one from a `google.script.run` call throws `GasForbiddenError`.
 
 ## Planned features
 

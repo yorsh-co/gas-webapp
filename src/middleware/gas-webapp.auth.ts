@@ -13,7 +13,7 @@
  *     isAuthorized: (email) => AUTHORIZED_EMAILS.includes(email),
  *   }));
  *
- * Peer dependency: UnauthorizedError (gas-error).
+ * Peer dependency: GasUnauthorizedError (gas-error).
  */
 const createAuthMiddleware =
   (config: AuthMiddlewareConfig): Middleware =>
@@ -22,7 +22,7 @@ const createAuthMiddleware =
     const email = Session.getActiveUser().getEmail();
 
     if (!config.isAuthorized(email)) {
-      throw new UnauthorizedError(`${email} is not authorized`);
+      throw new GasUnauthorizedError(`${email} is not authorized`);
     }
 
     // TODO: add optional session management using gas-webapp.session (still to be constructed)

@@ -7,8 +7,7 @@
  *
  * Peer dependency (expected as a global from a sibling subtree package,
  * not redeclared here):
- *   - GasError, NotFoundError, ForbiddenError,
- *     ValidationError, errorHandler                 (gas-error)
+ *   - GasError (and its Gas*Error subclasses)        (gas-error)
  *   - GasLogger                                     (gas-logger)
  */
 
@@ -23,7 +22,7 @@ interface GasWebAppStaticConfig {
 }
 
 interface GasWebAppConfig {
-  /** Passed to errorHandler for unhandled/operational errors. @default console */
+  /** Passed to GasError.handle for unhandled/operational errors. @default console */
   logger?: GasLogger | typeof console;
   /** Static asset resolution config for render()/include()/js()/css()/html(). */
   static?: GasWebAppStaticConfig;

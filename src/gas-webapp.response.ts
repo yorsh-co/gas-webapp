@@ -7,8 +7,7 @@
  *
  * Peer dependency (expected as a global from a sibling subtree package,
  * not redeclared here):
- *   - GasError, NotFoundError, ForbiddenError,
- *     ValidationError, errorHandler                 (gas-error)
+ *   - GasError and its Gas*Error subclasses         (gas-error)
  *   - GasLogger                                     (gas-logger)
  */
 

@@ -37,7 +37,7 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
 
       const lock = lockService.getLock(config.lockScope);
       if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
-        throw new RateLimitError(
+        throw new GasRateLimitError(
           'Too many requests — try again',
           retryAfterSeconds,
         );
@@ -52,7 +52,7 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
       }
 
       if (count > config.limit) {
-        throw new RateLimitError(
+        throw new GasRateLimitError(
           `Too many requests (${config.limit}/${config.windowSeconds}s)`,
           retryAfterSeconds,
         );
@@ -75,7 +75,7 @@ const createConcurrencyLimiter = (
     delta: number,
   ): number => {
     if (!lock || !lock.tryLock(3000)) {
-      if (delta > 0) throw new RateLimitError('Concurrency limiter busy');
+      if (delta > 0) throw new GasRateLimitError('Concurrency limiter busy');
       return -1; // best-effort release on contention — don't fail the response for this
     }
     try {
@@ -100,7 +100,7 @@ const createConcurrencyLimiter = (
       const after = adjust(key, lock, +1);
       if (after > config.limit) {
         adjust(key, lock, -1); // undo our own increment before failing
-        throw new RateLimitError(
+        throw new GasRateLimitError(
           `Too many concurrent requests (max ${config.limit})`,
         );
       }
