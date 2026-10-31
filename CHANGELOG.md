@@ -4,7 +4,7 @@
 
 ## [1.0.0] - 2026-10-31
 
-First tagged release, planned as 1.0.0. The API changed throughout against the untagged 0.x code; see the [migration guide](docs/migration-1.0.md).
+First tagged release, planned as 1.0.0. The API changed throughout against the untagged 0.x code; see the [migration guide](https://github.com/yorsh-co/gas-webapp/blob/main/docs/migration-1.0.md).
 
 ### Breaking
 
@@ -54,7 +54,7 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 - Vitest suites for the router, response, middleware, transport and browser client, run against the released `gas-error`, `gas-logger` and `gas-lock` peers with fakes for `HtmlService`, `ContentService`, `CacheService`, `LockService`, `Session` and `Utilities`, plus a fixture reproducing magb.kpis's `app.ts` routing on the new API
 - Apps Script tests (`npm run test:gas`) against the real services: HTTP and RPC envelopes, body parsing by content type, nested routers and error middleware, route resolution, `render` over both transports, the auth, ack, idempotency and both limiter middleware, and static path resolution
 - A fixture web app and checklist for the checks that need a deployment (`manual/`, `npm run manual:build`)
-- A [migration guide](docs/migration-1.0.md) from the 0.x API, using magb.kpis's `app.ts` as the worked example
+- A [migration guide](https://github.com/yorsh-co/gas-webapp/blob/main/docs/migration-1.0.md) from the 0.x API, using magb.kpis's `app.ts` as the worked example
 
 ### Changed
 
