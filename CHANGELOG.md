@@ -69,6 +69,7 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 - Both READMEs rewritten for the new API, with Express differences, platform limitations and the file push order reduced to what still applies
 - The package description matches the README and GitHub: "Express-style router and middleware for Google Apps Script web apps."
 - `doPost` falls back to `e.pathInfo` when `route` is absent, like `doGet`; `route` wins when both are present and empty values count as absent. A deployed web app showed `pathInfo` is populated on POST
+- `res.redirect` sends a "Continue to <host>" page with the link as a button, since browsers block the automatic navigation from `HtmlService`'s sandbox; the host shown drops any `user@` credentials
 - `build:watch` watches the browser client as well as the backend, and stops both compilers on interrupt or termination
 - `dist-web` no longer ships the empty `gas-webapp.client.d.ts`, `gas-webapp.config.d.ts` and `gas-webapp.errors.d.ts`; the client's types are in `types/gas-webapp.client.types.d.ts`
 

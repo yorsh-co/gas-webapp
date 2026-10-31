@@ -271,6 +271,27 @@ describe('res.redirect', () => {
     expect(html).toContain('href="https://example.com/a?b=1&amp;c=2"');
   });
 
+  it('offers a continue link naming the destination host', () => {
+    const { app } = redirectApp('https://example.com:8443/a');
+
+    const html = httpGet(app, '/go').getContent();
+
+    expect(html).toContain('<title>Continue to example.com:8443</title>');
+    expect(html).toMatch(
+      /<a [^>]*href="https:\/\/example\.com:8443\/a"[^>]*>Continue to example\.com:8443<\/a>/,
+    );
+    expect(html).not.toContain('Redirecting');
+  });
+
+  it('names the real host when the URL carries credentials', () => {
+    const { app } = redirectApp('https://trusted.com@evil.example/x');
+
+    const html = httpGet(app, '/go').getContent();
+
+    expect(html).toContain('Continue to evil.example');
+    expect(html).not.toContain('Continue to trusted.com');
+  });
+
   it('escapes the URL in both contexts', () => {
     const { app } = redirectApp('https://e.com/"</script><b>\u2028');
 

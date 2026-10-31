@@ -158,8 +158,9 @@ declare class GasWebAppResponse {
   /** Renders a view, optionally inside a layout. */
   render(viewName: string, options?: RenderOptions): void;
   /**
-   * Navigates the top window to an absolute http(s) URL. HTTP only: throws
-   * `GasForbiddenError` over `google.script.run`.
+   * Sends a "Continue to <host>" page linking to an absolute http(s) URL;
+   * browsers block automatic navigation from the sandbox, so the user follows
+   * the link. HTTP only: throws `GasForbiddenError` over `google.script.run`.
    */
   redirect(statusOrUrl: number | string, url?: string): void;
 }

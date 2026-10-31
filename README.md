@@ -526,7 +526,7 @@ app.use((req, res, next) => {
 });
 ```
 
-`res.redirect([status,] url)` returns a page that navigates the top window to `url`, with a link as the fallback: `HtmlService` serves pages in a sandboxed iframe, so there is no HTTP redirect (P2). The URL must be absolute `http(s)`, anything else is a 400. The optional status is only recorded in `res.statusCode`.
+`res.redirect([status,] url)` returns a page with a "Continue to &lt;host&gt;" link to `url`, plus a script that navigates the top window where the browser allows it. `HtmlService` serves pages in a sandboxed iframe, so there is no HTTP redirect (P2), and browsers block the automatic navigation without a click (P9): in practice the user follows the link. The host shown is the one the link really leads to, with any `user@` credentials dropped. The URL must be absolute `http(s)`, anything else is a 400. The optional status is only recorded in `res.statusCode`.
 
 Over `google.script.run`, `render` and `redirect` throw `GasForbiddenError`.
 
@@ -709,7 +709,7 @@ These are Apps Script constraints. They are documented, not fixed.
 | P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                                          |
 | P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                                                |
 | P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gas-dev-config` forbids them in Apps Script sources.                           |
-| P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which every tested browser blocks without a click. The user follows the page's link.                              |
+| P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which every tested browser blocks without a click. The user follows the page's "Continue to &lt;host&gt;" link.   |
 | P10 | An entry-point alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`; declare `doGet`/`doPost` as functions (see [Export the entry points](#export-the-entry-points)). |
 
 ### Platform notes
