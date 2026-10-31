@@ -2,8 +2,8 @@
  * Fixture app for the manual web app checks in manual/README.md.
  *
  * Pushed by `npm run manual:build` after the bundled peers and the compiled
- * library, as a global-scope Apps Script file. It uses the README's own
- * pattern, `const doGet = webApp.doGet`, so a deployment also checks that.
+ * library, as a global-scope Apps Script file. Its entry points are function
+ * declarations, as `google.script.run` (the client checks) needs.
  */
 const webApp = new GasWebApp({
   logger: console,
@@ -104,5 +104,10 @@ webApp.get('/teapot', () => {
   throw new GasError('I am a teapot', { statusCode: 418 });
 });
 
-const doGet = webApp.doGet;
-const doPost = webApp.doPost;
+function doGet(e) {
+  return webApp.doGet(e);
+}
+
+function doPost(e) {
+  return webApp.doPost(e);
+}

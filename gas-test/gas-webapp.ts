@@ -267,10 +267,10 @@ test('a POST with _method=DELETE is dispatched as DELETE', () => {
   assert(result.data === '7', `unexpected payload: ${JSON.stringify(result)}`);
 });
 
-test('doGet resolves the route from pathInfo, and route wins when both are present', () => {
+test('doGet and doPost resolve the route from pathInfo, and route wins when both are present', () => {
   const app = new GasWebApp();
-  app.get('/users/:id', (req, res) => res.json(req.params.id));
-  app.get('/other', (_req, res) => res.json('other'));
+  app.all('/users/:id', (req, res) => res.json(req.params.id));
+  app.all('/other', (_req, res) => res.json('other'));
 
   const event = (
     parameter: Record<string, string>,
@@ -286,13 +286,23 @@ test('doGet resolves the route from pathInfo, and route wins when both are prese
   ) as SuccessPayload;
   assert(both.data === 'other', `route should win: ${JSON.stringify(both)}`);
 
-  const post = thrownEnvelope(() =>
-    app.doPost({
-      parameter: {},
-      pathInfo: 'users/42',
-    } as unknown as GoogleAppsScript.Events.DoPost),
+  const post = app.doPost({
+    parameter: {},
+    pathInfo: 'users/42',
+  } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+  assert(
+    post.data === '42',
+    `doPost must read pathInfo: ${JSON.stringify(post)}`,
   );
-  assert(post.status === 404, 'doPost must not read pathInfo');
+
+  const postBoth = app.doPost({
+    parameter: { route: '/other' },
+    pathInfo: 'users/42',
+  } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+  assert(
+    postBoth.data === 'other',
+    `route should win on POST: ${JSON.stringify(postBoth)}`,
+  );
 });
 
 test('the idempotency guard runs once, replays, and clears on failure', () => {

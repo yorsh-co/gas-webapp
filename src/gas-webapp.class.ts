@@ -7,8 +7,17 @@
  * Usage:
  *   const webApp = new GasWebApp();
  *   webApp.use('/api/v1', apiRouter);
- *   const doGet = webApp.doGet;
- *   const doPost = webApp.doPost;
+ *
+ *   function doGet(e: GoogleAppsScript.Events.DoGet) {
+ *     return webApp.doGet(e);
+ *   }
+ *   function doPost(e: GoogleAppsScript.Events.DoPost) {
+ *     return webApp.doPost(e);
+ *   }
+ *
+ * Declare the entry points as functions: an alias such as
+ * `const doGet = webApp.doGet` works over HTTP but fails over
+ * `google.script.run`.
  *
  * Templates call helpers via the global instance, e.g.:
  *   <?!= webApp.include('partials/Header'); ?>
@@ -41,12 +50,12 @@ class GasWebApp extends GasWebAppRouter {
   // ENTRY POINTS
   // =========================
 
-  /** Arrow field (not a prototype method) so `this` survives being assigned to the global `doGet`. */
+  /** Arrow field (not a prototype method) so `this` stays bound when the method is passed around. */
   doGet = (e: GoogleAppsScript.Events.DoGet): WebAppResponse => {
     return this._handleRequest(e, 'GET');
   };
 
-  /** Arrow field (not a prototype method) so `this` survives being assigned to the global `doPost`. */
+  /** Arrow field (not a prototype method) so `this` stays bound when the method is passed around. */
   doPost = (e: GoogleAppsScript.Events.DoPost): WebAppResponse => {
     return this._handleRequest(e, 'POST');
   };
@@ -217,9 +226,7 @@ class GasWebApp extends GasWebAppRouter {
   ): GasWebAppRequest {
     const parameter = (e && e.parameter) || {};
     const { route, _method, ...query } = parameter;
-    const path = gasWebAppNormalizePath(
-      this._resolveRoute(route, e, entryMethod),
-    );
+    const path = gasWebAppNormalizePath(this._resolveRoute(route, e));
 
     return {
       method: this._resolveMethod(entryMethod, _method),
@@ -239,17 +246,14 @@ class GasWebApp extends GasWebAppRouter {
   }
 
   /**
-   * The route source: the `route` parameter, then, on GET only, `e.pathInfo`
-   * (which Apps Script populates unreliably on POST), then the root.
+   * The route source, on both entry points: the `route` parameter, then
+   * `e.pathInfo`, then the root. Empty values count as absent.
    */
   private _resolveRoute(
     route: string | undefined,
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
-    entryMethod: 'GET' | 'POST',
   ): string {
-    if (route) return route;
-    if (entryMethod === 'GET') return e?.pathInfo || '/';
-    return '/';
+    return route || e?.pathInfo || '/';
   }
 
   /**

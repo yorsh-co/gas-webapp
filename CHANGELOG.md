@@ -31,7 +31,7 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 - Routers mounted by reference (`use('/api', router)`): routes added later are live, and `req.baseUrl`/`req.path` follow the mount
 - `GasWebAppResponse` (`status`, `json`, `send`, `render`, `redirect`, `statusCode`, `sent`, `locals`); a second response throws `Response already sent`
 - `GasWebAppRequest` interface, open to declaration merging
-- Route resolution: `doGet` falls back to `e.pathInfo` when `route` is absent (`route` wins when both are present), so `/exec/users/42` reaches `/users/42`; `doPost` never reads `e.pathInfo`
+- Route resolution: `doGet` falls back to `e.pathInfo` when `route` is absent (`route` wins when both are present), so `/exec/users/42` reaches `/users/42`; `doPost` resolves the route the same way
 - `put`, `patch` and `delete` through a `_method` override on a POST (RPC and HTTP); any value other than PUT, PATCH or DELETE is a 400, and `_method` is ignored on GET
 - `GasWebApp.locals`, merged into `res.render` data under `res.locals` and the render options
 - `res.redirect([status,] url)`, an HTTP-only navigation of the top window to an absolute `http(s)` URL
@@ -68,11 +68,14 @@ First tagged release, planned as 1.0.0. The API changed throughout against the u
 - Documented that `req.transport` is advisory (a `google.script.run` caller controls the whole event, including `contextPath`) and must not drive security decisions, and that `NOT_DELIVERED` can be a false negative when a call is queued past `ackDeadlineMs` and then runs
 - Both READMEs rewritten for the new API, with Express differences, platform limitations and the file push order reduced to what still applies
 - The package description matches the README and GitHub: "Express-style router and middleware for Google Apps Script web apps."
+- `doPost` falls back to `e.pathInfo` when `route` is absent, like `doGet`; `route` wins when both are present and empty values count as absent. A deployed web app showed `pathInfo` is populated on POST
 - `build:watch` watches the browser client as well as the backend, and stops both compilers on interrupt or termination
 - `dist-web` no longer ships the empty `gas-webapp.client.d.ts`, `gas-webapp.config.d.ts` and `gas-webapp.errors.d.ts`; the client's types are in `types/gas-webapp.client.types.d.ts`
 
 ### Fixed
 
+- Entry points must be function declarations for `google.script.run`: the README, migration guide and manual fixture recommended `const doGet = app.doGet`, which works over HTTP but fails over `google.script.run` (`chained.doGet is not a function`). Every example now declares `function doGet(e)` and `function doPost(e)`
+- Docs: the README platform notes record the observed `pathInfo`, trailing slash, `contextPath`, MIME type and `res.redirect` behaviour of a deployed web app, and the sandbox caveat on `res.redirect` (P9)
 - Prefix middleware at root and root-mounted routers match every path; sub-routers are live rather than copied at mount time; unmatched requests pass through middleware before the 404
 - The session id passed to the error handler is the authenticated user's email, as the request is mutated in place
 - Request normalisation runs inside the error boundary, so a malformed JSON body returns the 400 envelope to HTTP and RPC callers instead of an Apps Script error page

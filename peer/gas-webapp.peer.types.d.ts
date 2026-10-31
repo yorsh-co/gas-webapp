@@ -230,8 +230,16 @@ interface GasWebAppConfig {
  * Single entry point for an Apps Script web app.
  *
  *   const webApp = new GasWebApp();
- *   const doGet = webApp.doGet;
- *   const doPost = webApp.doPost;
+ *
+ *   function doGet(e: GoogleAppsScript.Events.DoGet) {
+ *     return webApp.doGet(e);
+ *   }
+ *   function doPost(e: GoogleAppsScript.Events.DoPost) {
+ *     return webApp.doPost(e);
+ *   }
+ *
+ * Declare the entry points as functions: `google.script.run` fails on an
+ * alias such as `const doGet = webApp.doGet`, although HTTP accepts it.
  */
 declare class GasWebApp extends GasWebAppRouter {
   /** Data merged into every `res.render`, under `res.locals` and the render options. */
@@ -239,9 +247,9 @@ declare class GasWebApp extends GasWebAppRouter {
 
   constructor(config?: GasWebAppConfig);
 
-  /** Arrow field, so it survives being assigned to the global `doGet`. */
+  /** Arrow field, so `this` stays bound when the method is passed around. */
   doGet: (e: GoogleAppsScript.Events.DoGet) => WebAppResponse;
-  /** Arrow field, so it survives being assigned to the global `doPost`. */
+  /** Arrow field, so `this` stays bound when the method is passed around. */
   doPost: (e: GoogleAppsScript.Events.DoPost) => WebAppResponse;
 
   /** Server-side include for HTML Service templates. */

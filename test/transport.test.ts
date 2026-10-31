@@ -27,6 +27,7 @@ describe('route resolution (X2)', () => {
     app.all('/from-route', reply);
     app.all('/users/42', reply);
     app.all('/from-path', reply);
+    app.all('/echo', reply);
     return app;
   };
 
@@ -58,16 +59,18 @@ describe('route resolution (X2)', () => {
   it.each([
     ['route parameter', { parameter: { route: '/from-route' } }, '/from-route'],
     ['neither', { parameter: {} }, '/'],
-    [
-      'pathInfo but no route: pathInfo is never read',
-      { parameter: {}, pathInfo: 'users/42' },
-      '/',
-    ],
+    ['pathInfo but no route', { parameter: {}, pathInfo: 'echo' }, '/echo'],
     [
       'route and pathInfo: route wins',
       { parameter: { route: '/from-route' }, pathInfo: 'from-path' },
       '/from-route',
     ],
+    [
+      'empty route falls back to pathInfo',
+      { parameter: { route: '' }, pathInfo: 'echo' },
+      '/echo',
+    ],
+    ['empty pathInfo', { parameter: {}, pathInfo: '' }, '/'],
   ])('doPost: %s', (_name, event, expected) => {
     expect(resolved(setup().doPost(event))).toBe(expected);
   });
