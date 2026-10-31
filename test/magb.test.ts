@@ -23,7 +23,7 @@ const setup = () => {
   const make = (name: keyof typeof lib, config: object = {}) =>
     (lib[name] as Factory)(config);
 
-  const log = () => ({ info: vi.fn(), error: vi.fn() });
+  const log = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
   const webappLogger = log();
   const quietWebappLogger = log();
 
@@ -216,5 +216,9 @@ describe('magb.kpis app.ts on the new API', () => {
 
     expect(get(app, '/nowhere')).toMatchObject({ ok: false, status: 404 });
     expect(messages(webappLogger)[0]).toBe('-> GET /nowhere');
+    expect(webappLogger.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/^<- GET \/nowhere/),
+      expect.objectContaining({ status: 404 }),
+    );
   });
 });

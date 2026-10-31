@@ -15,6 +15,8 @@
 - A handler that returns without responding or calling `next` is a 500 reading `Route did not respond: GET /path`
 - `createAuthMiddleware` no longer sets `email` or `session` on the request
 - `createLoggingMiddleware` reads `res.statusCode` after `next()` returns, and logs `req.query` and `req.user` instead of `params` and `session`
+- `res.status(code).json(data)` with a `code` of 400 or more sends the error envelope (`ok: false`) instead of the success envelope, and is thrown over `google.script.run`, so the browser client rejects it
+- Over `google.script.run`, error middleware that answers with a status of 400 or more now throws the envelope instead of returning it as data
 
 ### Added
 
@@ -47,6 +49,14 @@
 - `put`, `patch` and `delete` through a `_method` override on a POST (RPC and HTTP); any value other than PUT, PATCH or DELETE is a 400, and `_method` is ignored on GET
 - Router, response and method-override unit tests, and a fixture reproducing magb.kpis's `app.ts` routing on the new API
 - Apps Script test for a request through nested routers, a path parameter and error middleware
+
+- Failed requests are resolved into the response as the router stack finishes, so middleware reading `res.statusCode` after `next()` sees the error status (404, 500...) instead of 200; the error is still logged once, by `GasError.handle`
+- `createLoggingMiddleware(logger, options?)` logs the response at `warn` from 400 and `error` from 500, and masks the values of `options.redact` query keys (default `token`, `password`, `secret`, `key`, `auth`, `authorization`; case-insensitive) as `[REDACTED]`
+- `lockScope` is optional on `createRateLimiter` and `createConcurrencyLimiter` and defaults to `'user'`; the scope rule and the throughput cost of `'script'` are documented
+- `GasWebApp.locals`, merged into `res.render` data under `res.locals` and the render options
+- `res.redirect([status,] url)`, an HTTP-only navigation of the top window to an absolute `http(s)` URL
+- `GasWebApp` `errorView` option, rendering errors on HTTP `GET` requests as an HTML page and falling back to the JSON envelope
+- Unit tests for every built-in middleware, and Apps Script tests for the `CacheService`-backed ack and rate limiter, lock contention in both limiters, and `Session` email availability
 
 ### Changed
 

@@ -371,7 +371,6 @@ webApp.post(
   createRateLimiter({
     limit: 5,
     windowSeconds: 60,
-    lockScope: 'user',
     keyFn: (req) => req.user.email,
   }),
   (req, res) => res.json(usersTable.insert(req.body)),
@@ -385,6 +384,16 @@ webApp.use((req, res, next) => {
 ```
 
 Middleware calls `next()` to continue, `next(err)` to skip to the error handlers, or `next('route')` to skip the rest of the current route. `next()` is synchronous: it returns once everything downstream has finished, so a middleware can read `res.statusCode` after calling it. There is no async middleware (Apps Script rejects `async`/`await`).
+
+`createLoggingMiddleware(logger, options?)` writes a request line and, once `next()` returns, a response line with the final `res.statusCode`: `info` below 400, `warn` from 400, `error` from 500. Errors are logged once, by `GasError.handle`, not here. Query values are logged with the keys in `options.redact` masked as `[REDACTED]` (exact, case-insensitive; default `token`, `password`, `secret`, `key`, `auth`, `authorization`; passing a list replaces the default). The request body is never logged.
+
+```js
+webApp.use(createLoggingMiddleware(gasLogger, { redact: ['token', 'ssn'] }));
+```
+
+### Limiter lock scope
+
+Both limiters read and write their counter under a lock, set by `lockScope` (`'user'` by default). The lock must cover the scope of the key: a key shared across users (a per-route or global key) needs `lockScope: 'script'`, because a per-user lock does not exclude other users. `'script'` serialises every request through the limiter behind one script lock, each waiting up to 10 seconds for it, so use it only for keys that need it.
 
 > **Note:**
 > When `createRateLimiter` rejects a request for exceeding the window count, the `GasRateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
@@ -465,9 +474,14 @@ res.json(usersTable.find()); // { ok: true, status: 200, data }
 res.status(201).json(created); // status travels in the envelope
 res.send('plain text'); // text over HTTP; the envelope's data over RPC
 res.render('Home', { layout: 'Layout', pageTitle: 'Dashboard' });
+res.redirect('https://example.com/next'); // HTTP only
 ```
 
-Apps Script cannot set an HTTP status, so `res.status()` sets the status in the success envelope. A response is sent once: a second `json`, `send` or `render` throws `Response already sent`. Set `res.locals` in middleware to pass data to every `render`.
+Apps Script cannot set an HTTP status, so `res.status()` sets the status in the envelope. With a status of 400 or more, `res.json(data)` sends the error envelope, `{ ok: false, status, code, error, details }`: `code` follows the status as in `gas-error` (400 `VALIDATION_ERROR`, 401 `UNAUTHORIZED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `CONFLICT`, 429 `RATE_LIMITED`, otherwise `INTERNAL_ERROR`), `error` is `data.message` when that is a string and `Request failed` otherwise, and `data` is `details`. Over `google.script.run` it is thrown, so the browser client rejects it like any other error. A response is sent once: a second `json`, `send`, `render` or `redirect` throws `Response already sent`.
+
+Data for `render` comes from three levels, later ones winning: `webApp.locals` (the whole app), `res.locals` (set in middleware, one request) and the options passed to `render`.
+
+`res.redirect([status,] url)` returns a page that navigates the top window to `url`, with a link as fallback: `HtmlService` serves pages in a sandboxed iframe, so a plain redirect is not possible. The URL must be absolute `http(s)`, anything else is a 400. The optional status is only recorded in `res.statusCode`. Over `google.script.run` it throws `GasForbiddenError`, like `render`.
 
 `render` resolves both the view and the layout through the configured `html` static dir, exactly like `webApp.html()` — `'Home'` becomes `dist/web/views/Home.html` by default — so pass logical names, not full paths. Omit `layout`, or pass `layout: null`, to render the view standalone. Rendering works only over a real HTTP request; over `google.script.run` it throws `GasForbiddenError`.
 
@@ -508,6 +522,16 @@ webApp.use((err, req, res, next) => {
 ```
 
 While an error is pending, only error handlers run. Without one, the error reaches `GasError.handle` (the `gas-error` peer), which serializes it consistently for both transports: `GasError` subclasses (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`) keep their status and message, anything else becomes a generic 500. Every failure takes this one path and is logged once, including a malformed request body. Real HTTP requests receive the error envelope as JSON text output; `google.script.run` calls receive an `Error` whose message is that JSON. The user in `req.user`, when auth set one, is logged as the session.
+
+The error is resolved into the response as the stack finishes, before `next()` returns to the middleware above, so a middleware that reads `res.statusCode` after `next()` sees the final status of a failed request, including a 404 for an unmatched route.
+
+To answer page routes with HTML instead of JSON, set an error view:
+
+```js
+const webApp = new GasWebApp({ errorView: 'Error' });
+```
+
+On an HTTP `GET`, the error is rendered through that view (resolved like `render`, standalone) with `{ error }` (the error envelope) and `webApp.locals`. `google.script.run` calls and other methods keep the JSON envelope, as does a request whose error view itself throws. The error is logged once either way.
 
 `createAuthMiddleware` sets `req.user = { email }`. It rejects with a `GasUnauthorizedError` (401) in two cases, with fixed messages that never echo the email: `Unable to identify the signed-in user` when `Session` throws or returns an empty email (scope declined, or a consumer account under **Execute as: Me**), and `Not authorized` when `isAuthorized` returns false.
 

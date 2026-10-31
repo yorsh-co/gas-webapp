@@ -433,9 +433,12 @@ describe('error handling', () => {
         res.status(500).json(err.message),
     );
 
-    const result = app.doGet({ parameter: { route: '/x' } });
-
-    expect(result).toEqual({ ok: true, status: 500, data: 'boom' });
+    expect(fail(app, '/x')).toMatchObject({
+      ok: false,
+      status: 500,
+      error: 'Request failed',
+      details: 'boom',
+    });
   });
 
   it('passes next(err) to error middleware', () => {

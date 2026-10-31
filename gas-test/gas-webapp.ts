@@ -9,6 +9,16 @@ const httpEvent = (route: string): GoogleAppsScript.Events.DoGet =>
     contextPath: '',
   }) as unknown as GoogleAppsScript.Events.DoGet;
 
+/** Runs `fn` and returns the error envelope carried by the thrown message. */
+const thrownEnvelope = (fn: () => unknown): Record<string, unknown> => {
+  try {
+    fn();
+  } catch (error) {
+    return JSON.parse(error instanceof Error ? error.message : String(error));
+  }
+  throw new Error('expected the call to throw');
+};
+
 const createTestApp = (): GasWebApp => {
   const app = new GasWebApp();
   app.get('ping', (_req, res) => res.json({ pong: true }));
@@ -229,10 +239,10 @@ test('a request runs through nested routers, a path param and error middleware',
     `unexpected payload: ${JSON.stringify(found)}`,
   );
 
-  const missing = app.doGet(rpcEvent('/api/users/0')) as SuccessPayload;
+  const missing = thrownEnvelope(() => app.doGet(rpcEvent('/api/users/0')));
   assert(
     missing.status === 404 &&
-      JSON.stringify(missing.data) === '{"missing":"No such user"}',
+      JSON.stringify(missing.details) === '{"missing":"No such user"}',
     `error middleware should answer: ${JSON.stringify(missing)}`,
   );
 
@@ -255,4 +265,110 @@ test('a POST with _method=DELETE is dispatched as DELETE', () => {
   } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
 
   assert(result.data === '7', `unexpected payload: ${JSON.stringify(result)}`);
+});
+
+test('the ack middleware records a call that its route then reports once', () => {
+  const callId = Utilities.getUuid();
+  const ack = createAckTracker({ ttlSeconds: 30 });
+  const app = new GasWebApp();
+  app.get('/ack', ack.handler);
+  app.use(ack.middleware);
+  app.get('/work', (_req, res) => res.json('done'));
+
+  app.doGet({
+    parameter: { route: '/work', callId },
+  } as unknown as GoogleAppsScript.Events.DoGet);
+
+  const poll = (): unknown =>
+    (
+      app.doGet({
+        parameter: { route: '/ack', callIds: callId },
+      } as unknown as GoogleAppsScript.Events.DoGet) as SuccessPayload
+    ).data;
+
+  assert(JSON.stringify(poll()) === JSON.stringify([callId]), 'not recorded');
+  assert(JSON.stringify(poll()) === '[]', 'the id should be forgotten');
+});
+
+test('the rate limiter counts in CacheService and rejects with retryAfterSeconds', () => {
+  const key = `gas-test-${Utilities.getUuid()}`;
+  const app = new GasWebApp();
+  app.get(
+    '/limited',
+    createRateLimiter({
+      limit: 1,
+      windowSeconds: 30,
+      keyFn: () => key,
+    }),
+    (_req, res) => res.json('ok'),
+  );
+
+  const first = app.doGet(rpcEvent('/limited')) as SuccessPayload;
+  assert(first.data === 'ok', 'the first request should pass');
+
+  const rejected = thrownEnvelope(() => app.doGet(rpcEvent('/limited')));
+  const details = rejected.details as { retryAfterSeconds?: number };
+  assert(rejected.status === 429, `expected 429, got ${rejected.status}`);
+  assert(
+    typeof details.retryAfterSeconds === 'number' &&
+      details.retryAfterSeconds >= 1 &&
+      details.retryAfterSeconds <= 30,
+    `unexpected details: ${JSON.stringify(rejected.details)}`,
+  );
+});
+
+test('the limiters fail with 429 when their lock cannot be acquired', () => {
+  const heldElsewhere = {
+    getLock: () =>
+      ({
+        tryLock: () => false,
+        releaseLock: () => {},
+      }) as unknown as GoogleAppsScript.Lock.Lock,
+  };
+  const key = `gas-test-${Utilities.getUuid()}`;
+  const app = new GasWebApp();
+  const reply: GasWebAppHandler = (_req, res) => res.json('ok');
+  app.get(
+    '/rate',
+    createRateLimiter({
+      limit: 10,
+      windowSeconds: 30,
+      keyFn: () => key,
+      lockService: heldElsewhere,
+    }),
+    reply,
+  );
+  app.get(
+    '/concurrency',
+    createConcurrencyLimiter({
+      limit: 10,
+      keyFn: () => key,
+      lockService: heldElsewhere,
+    }),
+    reply,
+  );
+
+  for (const route of ['/rate', '/concurrency']) {
+    const envelope = thrownEnvelope(() => app.doGet(rpcEvent(route)));
+    assert(envelope.status === 429, `${route}: ${JSON.stringify(envelope)}`);
+  }
+});
+
+info('a second script lock handle while one is held', () => {
+  const first = LockService.getScriptLock();
+  first.waitLock(5000);
+  try {
+    const second = LockService.getScriptLock();
+    return `second tryLock: ${second.tryLock(100)}`;
+  } finally {
+    first.releaseLock();
+  }
+});
+
+info('Session email availability', () => {
+  const active = Session.getActiveUser().getEmail();
+  const effective = Session.getEffectiveUser().getEmail();
+  return `active: ${active ? 'available' : 'empty'}, effective: ${
+    effective ? 'available' : 'empty'
+  }`;
 });

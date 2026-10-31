@@ -1,3 +1,13 @@
+const GAS_WEBAPP_LOGGING_DEFAULT_REDACT = [
+  'token',
+  'password',
+  'secret',
+  'key',
+  'auth',
+  'authorization',
+];
+const GAS_WEBAPP_LOGGING_REDACTED = '[REDACTED]';
+
 /**
  * Request logging middleware factory.
  *
@@ -5,16 +15,40 @@
  * app-specific logger instance. Binds id/transport once so every log
  * line for a request carries them without repeating them at each call
  * site — via logger.child(...) for GasLogger, or a small inline shim when
- * falling back to plain console (which has no .child()). The response line is
- * written once `next()` returns, so it reports the status and duration of
- * everything downstream. Usage:
+ * falling back to plain console (which has no .child()).
+ *
+ * The response line is written once `next()` returns, so it reports the final
+ * `res.statusCode` and the duration of everything downstream: `info` below 400,
+ * `warn` from 400, `error` from 500. Errors are not logged here; `GasError.handle`
+ * logs each once. The query is logged with the values of `options.redact` keys
+ * masked; the body never is. Usage:
  *   webApp.use(createLoggingMiddleware(webappLogger));
  *
  * Peer dependency: GasLogger (gas-logger), if not passing plain `console`.
  */
-const createLoggingMiddleware =
-  (logger: GasLogger | typeof console = console): GasWebAppHandler =>
-  (req, res, next) => {
+const createLoggingMiddleware = (
+  logger: GasLogger | typeof console = console,
+  options: GasWebAppLoggingConfig = {},
+): GasWebAppHandler => {
+  const redacted = new Set(
+    (options.redact ?? GAS_WEBAPP_LOGGING_DEFAULT_REDACT).map((key) =>
+      key.toLowerCase(),
+    ),
+  );
+
+  const redactQuery = (
+    query: Record<string, string>,
+  ): Record<string, string> => {
+    const safe: Record<string, string> = {};
+    for (const key of Object.keys(query)) {
+      safe[key] = redacted.has(key.toLowerCase())
+        ? GAS_WEBAPP_LOGGING_REDACTED
+        : (query[key] as string);
+    }
+    return safe;
+  };
+
+  return (req, res, next) => {
     const start = Date.now();
 
     // build http logger
@@ -29,6 +63,8 @@ const createLoggingMiddleware =
         : {
             info: (msg: string, meta?: Record<string, unknown>) =>
               logger.info(msg, { ...bindings, ...meta }),
+            warn: (msg: string, meta?: Record<string, unknown>) =>
+              logger.warn(msg, { ...bindings, ...meta }),
             error: (msg: string, meta?: Record<string, unknown>) =>
               logger.error(msg, { ...bindings, ...meta }),
             flush: (): void => {},
@@ -37,16 +73,19 @@ const createLoggingMiddleware =
     // log request
     httpLogger.info(`-> ${req.method} ${req.originalPath}`, {
       user: req.user,
-      params: req.query,
+      params: redactQuery(req.query),
     });
 
     next();
 
     // log result
-    httpLogger.info(
+    const status = res.statusCode;
+    const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+    httpLogger[level](
       `<- ${req.method} ${req.originalPath} (${Date.now() - start}ms)`,
-      { status: res.statusCode },
+      { status },
     );
 
     httpLogger.flush(); // for loggers using buffer
   };
+};
