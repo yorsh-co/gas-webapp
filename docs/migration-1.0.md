@@ -102,8 +102,13 @@ const app = new GasWebApp({
   logger: webappLogger,
 });
 
-const doGet = app.doGet;
-const doPost = app.doPost;
+function doGet(e: GoogleAppsScript.Events.DoGet) {
+  return app.doGet(e);
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost) {
+  return app.doPost(e);
+}
 
 // Delivery acknowledged — first, so a request that arrived and was then
 // rejected is still acknowledged and the client doesn't retry it as a drop.
@@ -134,6 +139,8 @@ app.use(
 app.use('/api/v1', apiRouter);
 app.use('/', webRouter);
 ```
+
+Declare `doGet` and `doPost` as functions, as the 0.x wrapper did. An alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`, where every call is rejected with `chained.doGet is not a function`.
 
 Three things to check when moving to ordered layers:
 

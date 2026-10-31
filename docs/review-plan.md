@@ -8,24 +8,20 @@ Delete this document once the last phase is merged; its findings are closed by t
 
 ## Decisions
 
-| #   | Topic                | Decision                                                                                                                                                                                      |
-| --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Middleware signature | Express style: `(req, res, next)` for middleware and handlers, `(err, req, res, next)` for error middleware. Replaces the current `(next) => (req) => result` composition.                    |
-| 2   | Route source         | Dual: the `route` parameter is canonical for both entry points and both transports; `doGet` falls back to `e.pathInfo` when `route` is absent; `doPost` never reads `e.pathInfo` (see below). |
-| 3   | HTTP methods         | `put`, `patch` and `delete` are supported through a method override on `doPost`, mirrored in the browser client.                                                                              |
+| #   | Topic                | Decision                                                                                                                                                                   |
+| --- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Middleware signature | Express style: `(req, res, next)` for middleware and handlers, `(err, req, res, next)` for error middleware. Replaces the current `(next) => (req) => result` composition. |
+| 2   | Route source         | Dual: the `route` parameter is canonical for both entry points and both transports; `doGet` and `doPost` fall back to `e.pathInfo` when `route` is absent (see below).     |
+| 3   | HTTP methods         | `put`, `patch` and `delete` are supported through a method override on `doPost`, mirrored in the browser client.                                                           |
 
 ### Route resolution
 
-In testing, `e.pathInfo` is populated for `doGet` but not reliably for `doPost`. A rule that read it on both would route a POST differently depending on a platform quirk, so the rule is per entry point:
-
-| Entry point | Resolution order                     |
-| ----------- | ------------------------------------ |
-| `doGet`     | `route` parameter, `e.pathInfo`, `/` |
-| `doPost`    | `route` parameter, `/`               |
+Both entry points resolve the route as `route` parameter, `e.pathInfo`, `/`; empty values count as absent. The first draft excluded `doPost` from the fallback because `pathInfo` looked unreliable there. A deployed web app showed otherwise: an anonymous POST to `/exec/echo?route=/echo` runs with `pathInfo` `"echo"`, and an anonymous POST to `/exec/echo` reaches `doPost`.
 
 - The browser client always sends `route`, so `google.script.run` callers are unaffected by the fallback.
-- When a GET carries both, `route` wins. This is documented, not an error.
-- Express-style links (`/exec/users/42`) therefore work for pages and GET APIs; HTTP POSTs must use `?route=`.
+- When a request carries both, `route` wins. This is documented, not an error.
+- An anonymous GET with a path after `/exec` is redirected to the Google sign-in page and never runs the script; a signed-in GET runs with `pathInfo` `"users/42"`. `?route=` is therefore the form that works for every caller.
+- `/exec/` (trailing slash) is Apps Script's own 404; `e.contextPath` is `""` on GET and POST.
 
 ### Method override
 
@@ -124,7 +120,7 @@ These are Apps Script constraints. They are documented, not fixed.
 | P1  | Every HTTP response is a 200; the status exists only in the envelope.                                                                                                                   |
 | P2  | No response headers, cookies or HTTP redirects. `res.redirect` is an HTML navigation of the top window, HTTP-only.                                                                      |
 | P3  | `e.parameter` keeps only the first value of a repeated key; `e.parameters` holds them all.                                                                                              |
-| P4  | `e.pathInfo` is unreliable on `doPost` (see Route resolution).                                                                                                                          |
+| P4  | An anonymous GET with a path after `/exec` never reaches the script, so `?route=` is the universal form (see Route resolution).                                                         |
 | P5  | Delivery acknowledgement costs one `CacheService` write per request plus polling while calls are in flight.                                                                             |
 | P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and the consumer's build wraps it into `.js.html` for `HtmlService`.                            |
 | P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                            |
@@ -167,8 +163,13 @@ app.use((err, req, res, next) => {
   /* custom error handling; gas-error is the default */
 });
 
-const doGet = app.doGet;
-const doPost = app.doPost;
+function doGet(e: GoogleAppsScript.Events.DoGet) {
+  return app.doGet(e);
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost) {
+  return app.doPost(e);
+}
 ```
 
 | Object | Members                                                                                                                                                       |
@@ -338,7 +339,7 @@ Branch: `feature/transport`. Closes X2, X6 (client side), X8, C4.
 - [x] Client: PUT, PATCH and DELETE do not retry by default, like POST.
 - [x] Document that `NOT_DELIVERED` can be a false negative under queuing (C4).
 - [x] Optional `idempotencyKey` request option, with a server helper that checks it against `CacheService` (C4).
-- [ ] Manual check on a test web app deployment: `e.pathInfo` on GET and POST, `contextPath`, form and JSON POST bodies, response MIME types. Record the results in the README's platform notes.
+- [x] Manual check on a test web app deployment: `e.pathInfo` on GET and POST, `contextPath`, form and JSON POST bodies, response MIME types. Recorded in the README's platform notes.
 - [x] `npm run test:gas` passes on the test project.
 - [x] `npm run check` passes.
 - [x] CHANGELOG `[Unreleased]` updated.
@@ -377,7 +378,7 @@ Branch: `feature/docs-v1`. Closes T3, T5.
 
 ## Outstanding manual steps
 
-1. Run the checks in [`manual/README.md`](../manual/README.md) on a throwaway deployment and record the results (`e.pathInfo`, `e.contextPath`, MIME types, the `res.redirect` outcome) in the README's platform notes. This closes the unticked Phase 6 manual check.
+1. Finish the manual checks in [`manual/README.md`](../manual/README.md): the client checks 23-27, after redeploying a new version with the function-declaration entry points, and a signed-in POST with a path. The other checks are done and recorded in the README's platform notes.
 2. Release gas-dev-config 1.5.0, then bump it here to `^1.5.0` and remove the mirrored `async`/`await` rule from `eslint.config.js`.
 3. Cut `release/1.0.0`: version bump, git-flow release, `npm run build:release`, and push the branches and tags.
 4. Delete this document.

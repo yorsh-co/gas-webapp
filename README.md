@@ -58,8 +58,13 @@ app.use(
 
 app.get('/', (req, res) => res.render('Home', { layout: 'Layout' }));
 
-const doGet = app.doGet;
-const doPost = app.doPost;
+function doGet(e: GoogleAppsScript.Events.DoGet) {
+  return app.doGet(e);
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost) {
+  return app.doPost(e);
+}
 ```
 
 ## Requirements
@@ -76,7 +81,7 @@ const doPost = app.doPost;
 
 ### Deployment
 
-`gas-webapp` must be deployed as an Apps Script **Web App** (Apps Script editor → Deploy → New deployment → Web app), with `doGet`/`doPost` assigned from a `GasWebApp` instance.
+`gas-webapp` must be deployed as an Apps Script **Web App** (Apps Script editor → Deploy → New deployment → Web app), with top-level `doGet`/`doPost` functions that delegate to a `GasWebApp` instance.
 
 `createAuthMiddleware` needs `Session.getActiveUser().getEmail()` to return the calling user: **Execute as: User accessing the web app**, with the `https://www.googleapis.com/auth/userinfo.email` scope granted. Under **Execute as: Me**, consumer accounts and callers outside your domain have a blank email and are rejected with a 401.
 
@@ -194,8 +199,13 @@ const app = new GasWebApp();
 
 app.get('/', (req, res) => res.json({ ok: true }));
 
-const doGet = app.doGet;
-const doPost = app.doPost;
+function doGet(e: GoogleAppsScript.Events.DoGet) {
+  return app.doGet(e);
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost) {
+  return app.doPost(e);
+}
 ```
 
 ## Setup instructions with `clasp`
@@ -298,13 +308,20 @@ const app = new GasWebApp({
 
 ### Export the entry points
 
-```js
-const doGet = app.doGet;
-const doPost = app.doPost;
+```ts
+function doGet(e: GoogleAppsScript.Events.DoGet) {
+  return app.doGet(e);
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost) {
+  return app.doPost(e);
+}
 ```
 
 > **Note:**
-> `doGet`/`doPost` are arrow-function class fields, not prototype methods, so they keep their `this` binding once assigned to the global `doGet`/`doPost` Apps Script calls.
+> Declare `doGet` and `doPost` as functions. An alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`, where every call is rejected with `chained.doGet is not a function`.
+>
+> `app.doGet`/`app.doPost` are arrow-function class fields, not prototype methods, so they keep their `this` binding when passed around.
 
 ### Register routes
 
@@ -349,21 +366,21 @@ interface GasWebAppRequest {
 
 ### Route resolution and method override
 
-The target route is resolved per entry point:
+The target route is resolved the same way for both entry points:
 
-| Entry point | Resolution order                     |
-| ----------- | ------------------------------------ |
-| `doGet`     | `route` parameter, `e.pathInfo`, `/` |
-| `doPost`    | `route` parameter, `/`               |
+| Entry point       | Resolution order                     |
+| ----------------- | ------------------------------------ |
+| `doGet`, `doPost` | `route` parameter, `e.pathInfo`, `/` |
 
 - `google.script.run` callers always send `route`.
-- When a GET carries both, `route` wins silently.
-- `e.pathInfo` is unreliable on `doPost` (P4), so it is never read there: Express-style links (`/exec/users/42`) work for pages and GET APIs, and HTTP POSTs must use `?route=`. Apps Script delivers `pathInfo` without a leading slash; it is normalised like any other path.
+- When a request carries both, `route` wins silently. Empty values count as absent.
+- Apps Script delivers `pathInfo` without a leading slash; it is normalised like any other path.
+- An anonymous GET with a path after `/exec` is redirected to the Google sign-in page and never reaches the script (P4). Express-style links (`/exec/users/42`) therefore work only for signed-in callers; `?route=` is the form that works for every caller.
 
 ```js
 // Real HTTP request
 fetch(`${webAppUrl}?route=/api/users`);
-fetch(`${webAppUrl}/api/users`); // GET only, through e.pathInfo
+fetch(`${webAppUrl}/api/users`); // through e.pathInfo; signed-in callers only
 
 // google.script.run
 google.script.run
@@ -670,10 +687,10 @@ app.use(createLoggingMiddleware(gasLogger, { redact: ['token', 'ssn'] }));
 - **Synchronous only.** Apps Script rejects `async` and `await` on push (P8), and `doGet`/`doPost` must return synchronously. `next()` is a plain synchronous call, and there is no async middleware. The browser client runs in the browser and keeps its `async`/`await`.
 - **Always HTTP 200.** The status exists only in the envelope (P1). Clients must read `ok`/`status`, not the HTTP status.
 - **No headers or cookies.** There is no `res.set`, `res.cookie` or `req.headers`, and `Content-Type` is chosen by the output type (P2).
-- **`render` and `redirect` are HTTP-only.** `google.script.run` cannot carry HTML or navigate, so both throw `GasForbiddenError` over RPC. `redirect` is a top-window navigation of an HTML page, not an HTTP redirect.
+- **`render` and `redirect` are HTTP-only.** `google.script.run` cannot carry HTML or navigate, so both throw `GasForbiddenError` over RPC. `redirect` is a top-window navigation of an HTML page, not an HTTP redirect, and browsers commonly block it (P9).
 - **A wrong method is a 404,** not a 405: `gas-error` has no 405.
 - **Return values are ignored.** A route responds only through `res`.
-- **PUT, PATCH and DELETE are POSTs** with `_method`, and POSTs resolve the route from `?route=` only (P4).
+- **PUT, PATCH and DELETE are POSTs** with `_method`.
 - **No body parser middleware.** The body is parsed by content type before routing; form fields arrive in `req.query`, and a repeated key keeps its first value (P3).
 - **`req.transport` is advisory,** and `req.params` holds only path parameters; `req.query` holds the request parameters.
 - **No view engine.** Views are `HtmlService` templates resolved through the `static` config.
@@ -682,16 +699,29 @@ app.use(createLoggingMiddleware(gasLogger, { redact: ['token', 'ssn'] }));
 
 These are Apps Script constraints. They are documented, not fixed.
 
-| ID  | Limitation                                                                                                                                                                        |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | Every HTTP response is a 200; the status exists only in the envelope.                                                                                                             |
-| P2  | No response headers, cookies or HTTP redirects. `res.redirect` is an HTML navigation of the top window, HTTP-only.                                                                |
-| P3  | `e.parameter` keeps only the first value of a repeated key; `e.parameters` holds them all.                                                                                        |
-| P4  | `e.pathInfo` is unreliable on `doPost`, so routes are resolved from `?route=` there.                                                                                              |
-| P5  | Delivery acknowledgement costs one `CacheService` write per request plus polling while calls are in flight.                                                                       |
-| P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                |
-| P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                      |
-| P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gas-dev-config` forbids them in Apps Script sources. |
+| ID  | Limitation                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | Every HTTP response is a 200; the status exists only in the envelope.                                                                                                                                       |
+| P2  | No response headers, cookies or HTTP redirects. `res.redirect` is an HTML navigation of the top window, HTTP-only.                                                                                          |
+| P3  | `e.parameter` keeps only the first value of a repeated key; `e.parameters` holds them all.                                                                                                                  |
+| P4  | An anonymous GET with a path after `/exec` is redirected to the Google sign-in page and never runs the script, so `?route=` is the form that works for every caller.                                        |
+| P5  | Delivery acknowledgement costs one `CacheService` write per request plus polling while calls are in flight.                                                                                                 |
+| P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                                          |
+| P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                                                |
+| P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gas-dev-config` forbids them in Apps Script sources.                           |
+| P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which browsers commonly block. The fallback link is the reliable path.                                            |
+| P10 | An entry-point alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`; declare `doGet`/`doPost` as functions (see [Export the entry points](#export-the-entry-points)). |
+
+### Platform notes
+
+Observed on a deployed web app (`manual/` fixture):
+
+- **`e.pathInfo`.** A signed-in GET to `/exec/users/42` runs with `pathInfo` `"users/42"`; with `?route=/users/42` also present, `route` wins. An anonymous GET with a path never reaches the script. An anonymous POST to `/exec/echo?route=/echo` runs with `pathInfo` `"echo"`, and an anonymous POST to `/exec/echo` reaches `doPost`. A signed-in POST with a path is not yet confirmed.
+- **Trailing slash.** `/exec/` is answered by Apps Script's own 404 page; the script does not run.
+- **`e.contextPath`** is `""` on GET and POST.
+- **Response types.** A JSON response is a 302 (`application/binary`) to `script.googleusercontent.com/macros/echo...`, then a 200 `application/json; charset=utf-8`. An `HtmlService` response is a 200 `text/html; charset=utf-8` served directly from `script.google.com`, with the page content inside `HtmlService`'s sandboxed iframe.
+- **`res.redirect`.** Automatic top-window navigation is commonly blocked in `HtmlService`'s sandbox: on Android Firefox the fallback link had to be clicked, and Android Chrome showed a "redirect blocked" popup. The fallback link is the reliable path. Desktop is untested.
+- **Entry points.** `const doGet = app.doGet` works for HTTP but not for `google.script.run`.
 
 ## Development
 
