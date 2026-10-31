@@ -1,0 +1,9 @@
+# Node / NPM
+node_modules/
+
+# dist
+dist/
+.worktrees/
+
+# Manual web app fixture build
+.manual-webapp/

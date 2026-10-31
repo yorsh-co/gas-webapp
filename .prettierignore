@@ -1,0 +1,5 @@
+node_modules
+.worktrees
+.manual-webapp
+# Apps Script scriptlets (<? ?>) are not valid HTML for Prettier to reflow
+manual/views
