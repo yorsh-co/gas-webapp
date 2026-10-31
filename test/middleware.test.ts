@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadGasWebApp } from './harness';
 
-type Next = (request: object) => unknown;
-type Factory = (config: object) => (next: Next) => Next;
+type Factory = (
+  config: object,
+) => (req: object, res: object, next: () => void) => void;
 
-const request = { params: {}, route: 'x' };
-const next: Next = () => 'ok';
+const response = {};
+const request = (): Record<string, unknown> => ({ query: {} });
 
 const lockWith = (...results: boolean[]) => {
   const tryLock = vi.fn<(timeoutMs: number) => boolean>();
@@ -30,7 +31,8 @@ describe('createConcurrencyLimiter', () => {
   it('takes its lock from config.lockService (M1)', () => {
     const { middleware, mocks, lockService } = concurrency(lockWith(true));
 
-    middleware(next)(request);
+    const next = vi.fn();
+    middleware(request(), response, next);
 
     expect(lockService.getLock).toHaveBeenCalledWith('user');
     expect(mocks.LockService.getUserLock).not.toHaveBeenCalled();
@@ -39,7 +41,8 @@ describe('createConcurrencyLimiter', () => {
   it('retries a contended release instead of leaking the slot (M2)', () => {
     const { middleware, mocks } = concurrency(lockWith(true, false, true));
 
-    middleware(next)(request);
+    const next = vi.fn();
+    middleware(request(), response, next);
 
     expect(mocks.cacheStore.get('concurrency:k')).toBe('0');
   });
@@ -48,14 +51,18 @@ describe('createConcurrencyLimiter', () => {
     const lock = lockWith(true, false);
     const { middleware } = concurrency(lock);
 
-    expect(middleware(next)(request)).toBe('ok');
+    const next = vi.fn();
+    middleware(request(), response, next);
+
+    expect(next).toHaveBeenCalledOnce();
     expect(lock.tryLock).toHaveBeenCalledTimes(3);
   });
 
   it('keeps the counter for longer than the execution limit (M2)', () => {
     const { middleware, mocks } = concurrency(lockWith(true));
 
-    middleware(next)(request);
+    const next = vi.fn();
+    middleware(request(), response, next);
 
     const ttls = mocks.CacheService.getScriptCache().put.mock.calls.map(
       ([, , ttl]) => ttl,
@@ -71,7 +78,9 @@ describe('createAuthMiddleware (M4)', () => {
   ) => {
     const { lib, mocks } = loadGasWebApp(options);
     const middleware = (lib.createAuthMiddleware as Factory)({ isAuthorized });
-    return { mocks, call: () => middleware(next)(request) };
+    const next = vi.fn();
+    const req = request();
+    return { mocks, next, req, call: () => middleware(req, response, next) };
   };
 
   const rejection = (call: () => unknown): Error & { statusCode?: number } => {
@@ -115,9 +124,12 @@ describe('createAuthMiddleware (M4)', () => {
     expect(error.message).toBe('Not authorized');
   });
 
-  it('passes an authorised user downstream', () => {
-    const { call } = run({ email: 'a@b.c' }, () => true);
+  it('sets req.user and passes an authorised user downstream', () => {
+    const { call, next, req } = run({ email: 'a@b.c' }, () => true);
 
-    expect(call()).toBe('ok');
+    call();
+
+    expect(req.user).toEqual({ email: 'a@b.c' });
+    expect(next).toHaveBeenCalledOnce();
   });
 });

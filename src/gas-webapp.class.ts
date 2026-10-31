@@ -1,10 +1,8 @@
 /**
- * Single entry point for an Apps Script web app. Extends GasWebAppRouter directly
- * (like express() vs express.Router()) — GasWebApp IS a router, so top-level
- * routes/middleware register straight onto it via the inherited .get()/
- * .post()/.use(). Sub-routers meant to be mounted (`webApp.use('/api', x)`)
- * should stay plain `GasWebAppRouter` instances — they don't need the response/
- * template layer this class adds on top.
+ * Single entry point for an Apps Script web app. Extends GasWebAppRouter
+ * directly (like express() vs express.Router()), so top-level routes and
+ * middleware register straight onto it. Sub-routers meant to be mounted
+ * (`webApp.use('/api', api)`) stay plain `GasWebAppRouter` instances.
  *
  * Usage:
  *   const webApp = new GasWebApp();
@@ -47,41 +45,6 @@ class GasWebApp extends GasWebAppRouter {
   doPost = (e: GoogleAppsScript.Events.DoPost): WebAppResponse => {
     return this._handleRequest(e, 'POST');
   };
-
-  // =========================
-  // RESPONSE HELPERS
-  // =========================
-
-  /** Wrap data in the standard success payload. */
-  json(data: unknown, status = 200): JsonResponse {
-    return new JsonResponse({ ok: true, status, data });
-  }
-
-  /**
-   * Render a view, optionally injected into a layout. Both names are resolved
-   * against the configured `html` static dir, like `html()`. Omit `layout`, or
-   * pass `null`, to render the view standalone.
-   */
-  render(viewName: string, options: RenderOptions = {}): HtmlResponse {
-    const { layout, ...data } = options;
-
-    const viewTemplate = HtmlService.createTemplateFromFile(
-      this.resolveStaticFilePath('html', viewName),
-    );
-    Object.assign(viewTemplate, data);
-    const body = viewTemplate.evaluate().getContent();
-
-    if (layout == null) {
-      return new HtmlResponse(HtmlService.createHtmlOutput(body));
-    }
-
-    const layoutTemplate = HtmlService.createTemplateFromFile(
-      this.resolveStaticFilePath('html', layout),
-    );
-    Object.assign(layoutTemplate, data, { body });
-
-    return new HtmlResponse(layoutTemplate.evaluate());
-  }
 
   // =========================
   // TEMPLATE HELPERS
@@ -134,17 +97,43 @@ class GasWebApp extends GasWebAppRouter {
 
   private _handleRequest(
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
-    method: HttpMethod,
+    entryMethod: 'GET' | 'POST',
   ): WebAppResponse {
-    const isHttpRequest = this._isHttpRequest(e);
-    let request: RouteRequest | undefined;
+    let req: GasWebAppRequest | undefined;
 
     try {
-      request = this._normalizeRequest(e, method);
-      return this._serialize(this._dispatch(request), isHttpRequest);
+      req = this._normalizeRequest(e, entryMethod);
+      const res = new GasWebAppResponse(req.transport, (type, path) =>
+        this.resolveStaticFilePath(type, path),
+      );
+      this._dispatch(req, res);
+      return this._serialize(res, req);
     } catch (err) {
-      return this._fail(err, e, method, isHttpRequest, request);
+      return this._fail(err, e, entryMethod, req);
     }
+  }
+
+  /**
+   * Runs the router stack, then the final handler: a pending error is thrown
+   * to `_fail`, and a request nothing answered is a 404, or a 500 when a
+   * layer stopped without responding or calling `next`.
+   */
+  private _dispatch(req: GasWebAppRequest, res: GasWebAppResponse): void {
+    let exhausted = false;
+    let pending: unknown;
+
+    this.handle(req, res, (err) => {
+      exhausted = true;
+      pending = err;
+    });
+
+    if (exhausted && pending !== undefined && pending !== null) throw pending;
+    if (res.sent) return;
+
+    const target = `${req.method} ${req.originalPath}`;
+    if (exhausted) throw new GasNotFoundError(`Cannot ${target}`);
+
+    throw new GasError(`Route did not respond: ${target}`, { statusCode: 500 });
   }
 
   /** A real web app request carries `contextPath`; `google.script.run` calls do not. */
@@ -166,18 +155,17 @@ class GasWebApp extends GasWebAppRouter {
   private _fail(
     err: unknown,
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
-    method: HttpMethod,
-    isHttpRequest: boolean,
-    request?: RouteRequest,
+    entryMethod: 'GET' | 'POST',
+    req?: GasWebAppRequest,
   ): WebAppResponse {
     const context = {
       logger: this._logger,
-      method,
-      path: request?.route ?? e?.parameter?.route ?? '',
-      sessionId: request?.email || '',
+      method: req?.method ?? entryMethod,
+      path: req?.originalPath ?? e?.parameter?.route ?? '',
+      sessionId: req?.user?.email ?? '',
     };
 
-    if (!isHttpRequest) return GasError.handle(err, context);
+    if (!this._isHttpRequest(e)) return GasError.handle(err, context);
 
     const payload = GasError.handle(err, { ...context, rethrow: false });
 
@@ -186,25 +174,50 @@ class GasWebApp extends GasWebAppRouter {
     );
   }
 
+  /**
+   * @throws {GasValidationError} When the body is malformed JSON, or `_method`
+   * is not PUT, PATCH or DELETE.
+   */
   private _normalizeRequest(
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
-    method: HttpMethod,
-  ): RouteRequest {
-    const params = (e && e.parameter) || {};
-    const body =
-      method === 'POST'
-        ? this._parseBody((e as GoogleAppsScript.Events.DoPost).postData)
-        : undefined;
+    entryMethod: 'GET' | 'POST',
+  ): GasWebAppRequest {
+    const parameter = (e && e.parameter) || {};
+    const { route, _method, ...query } = parameter;
+    const path = gasWebAppNormalizePath(route || '/');
 
     return {
-      route: params.route || '/',
-      method,
-      isHttpRequest: this._isHttpRequest(e),
-      reqId: Utilities.getUuid(),
-      params,
-      body,
+      method: this._resolveMethod(entryMethod, _method),
+      path,
+      originalPath: path,
+      baseUrl: '',
+      params: {},
+      query,
+      body:
+        entryMethod === 'POST'
+          ? this._parseBody((e as GoogleAppsScript.Events.DoPost).postData)
+          : undefined,
+      id: Utilities.getUuid(),
+      transport: this._isHttpRequest(e) ? 'http' : 'rpc',
       raw: e,
     };
+  }
+
+  /**
+   * Applies the `_method` override: a POST carrying PUT, PATCH or DELETE
+   * (any case) is dispatched as that method. `_method` is ignored on GET.
+   */
+  private _resolveMethod(
+    entryMethod: 'GET' | 'POST',
+    override: string | undefined,
+  ): HttpMethod {
+    if (entryMethod === 'GET' || override === undefined) return entryMethod;
+
+    const method = override.toUpperCase();
+    if (method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+      return method;
+    }
+    throw new GasValidationError('Invalid _method');
   }
 
   /**
@@ -238,33 +251,24 @@ class GasWebApp extends GasWebAppRouter {
     return postData.contents;
   }
 
-  private _dispatch(request: RouteRequest): AppResponse {
-    const result = super.dispatch(request);
-
-    if (result instanceof JsonResponse || result instanceof HtmlResponse) {
-      return result;
-    }
-
-    return this.json(result);
-  }
-
   private _serialize(
-    response: AppResponse,
-    isHttpRequest: boolean,
+    res: GasWebAppResponse,
+    req: GasWebAppRequest,
   ): WebAppResponse {
-    if (response instanceof HtmlResponse) {
-      if (!isHttpRequest) {
-        throw new GasForbiddenError(
-          'HtmlResponse cannot be returned over google.script.run',
-        );
-      }
-      return response.output;
+    const outcome = res.outcome as GasWebAppOutcome;
+
+    if (outcome.kind === 'html') return outcome.output;
+
+    if (outcome.kind === 'text') {
+      return ContentService.createTextOutput(outcome.content).setMimeType(
+        ContentService.MimeType.TEXT,
+      );
     }
 
-    return isHttpRequest
+    return req.transport === 'http'
       ? ContentService.createTextOutput(
-          JSON.stringify(response.payload),
+          JSON.stringify(outcome.payload),
         ).setMimeType(ContentService.MimeType.JSON)
-      : (response as JsonResponse).payload;
+      : outcome.payload;
   }
 }

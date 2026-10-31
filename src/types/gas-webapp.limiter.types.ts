@@ -15,7 +15,7 @@ interface RateLimitConfig {
   limit: number;
   windowSeconds: number;
   lockScope: LockScope;
-  keyFn: (request: RouteRequest) => string;
+  keyFn: (req: GasWebAppRequest) => string;
   /** @default resolves LockService.get{Script,User}Lock() directly */
   lockService?: GasWebAppLockService;
 }
@@ -23,7 +23,7 @@ interface RateLimitConfig {
 interface ConcurrencyLimitConfig {
   limit: number;
   lockScope: LockScope;
-  keyFn: (request: RouteRequest) => string;
+  keyFn: (req: GasWebAppRequest) => string;
   /** @default resolves LockService.get{Script,User}Lock() directly */
   lockService?: GasWebAppLockService;
 }

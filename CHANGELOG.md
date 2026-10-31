@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- The `(next) => (request) => result` middleware composition is replaced by Express-style `(req, res, next)` handlers and `(err, req, res, next)` error handlers. Handler return values are ignored: a route responds only through `res`
+- `RouteRequest`, `Handler`, `Middleware`, `JsonResponse`, `HtmlResponse`, `GasWebApp.json()` and `GasWebApp.render()` are removed. Use `GasWebAppRequest`, `GasWebAppHandler`, `res.json()` and `res.render()`
+- `req` is reshaped: `route` becomes `path` (relative to the mount) and `originalPath`; `params` becomes `query`, and `params` now holds path parameters; `reqId` becomes `id`; `isHttpRequest` becomes `transport` (`'http' | 'rpc'`); `email` and `session` become `req.user = { email }`
+- `use()` middleware and routes run in registration order. Middleware registered after a route no longer applies to it, and `use('/', mw)` now matches every path instead of the root only
+- Registering the same method and path twice stacks the handlers instead of overwriting the first
+- A request nothing answers is a 404 reading `Cannot GET /path`, after the middleware has run; a wrong method is also a 404, as `gas-error` has no 405
+- A handler that returns without responding or calling `next` is a 500 reading `Route did not respond: GET /path`
+- `createAuthMiddleware` no longer sets `email` or `session` on the request
+- `createLoggingMiddleware` reads `res.statusCode` after `next()` returns, and logs `req.query` and `req.user` instead of `params` and `session`
+
 ### Added
 
 - `GasWebApp` entry point extending `GasWebAppRouter`, handling `doGet`/`doPost` for both real HTTP requests and `google.script.run` calls through the same route table
@@ -27,6 +39,14 @@
 - Apps Script tests (`npm run test:gas`): the bundled peers and `GasWebApp` load, and simulated RPC and HTTP requests return the success and error envelopes
 - Vitest harness for the browser client, loading `src/web` in a sandbox with a fake `window` and `google.script.run`
 - Apps Script tests for HTTP error output, body parsing by content type, `HtmlResponse` over both transports, static path resolution, and the auth and concurrency middleware against the real services
+- Express-style routing in `GasWebAppRouter`: `get`, `post`, `put`, `patch`, `delete`, `all` and `use` share one ordered stack, with `next()`, `next(err)` and `next('route')`, error middleware detected by its four parameters, and thrown errors passed to `next(err)`
+- Path patterns in the Express 5 syntax, compiled at registration without dependencies: `:name`, `*name` and `{optional}` groups, case-insensitive with an optional trailing slash and URI-decoded parameters
+- Routers mounted by reference (`use('/api', router)`): routes added later are live, and `req.baseUrl`/`req.path` follow the mount
+- `GasWebAppResponse` (`status`, `json`, `send`, `render`, `statusCode`, `sent`, `locals`); a second response throws `Response already sent`
+- `GasWebAppRequest` interface, open to declaration merging
+- `put`, `patch` and `delete` through a `_method` override on a POST (RPC and HTTP); any value other than PUT, PATCH or DELETE is a 400, and `_method` is ignored on GET
+- Router, response and method-override unit tests, and a fixture reproducing magb.kpis's `app.ts` routing on the new API
+- Apps Script test for a request through nested routers, a path parameter and error middleware
 
 ### Changed
 
@@ -47,6 +67,8 @@
 
 ### Fixed
 
+- Prefix middleware at root and root-mounted routers match every path (R1, R2); sub-routers are live rather than copied at mount time (R3); unmatched requests pass through middleware before the 404 (R5)
+- The session id passed to the error handler is the authenticated user's email, as the request is mutated in place (L4)
 - Request normalisation runs inside the error boundary, so a malformed JSON body returns the 400 envelope to HTTP and RPC callers instead of an Apps Script error page
 - HTTP errors are serialised from `GasError.handle(err, { rethrow: false })`, so the output is always valid JSON; every error, including an `HtmlResponse` returned over `google.script.run`, takes this one path and is logged once
 - `resolveStaticFilePath('js', 'app')` returned `dist/web/public/jsapp/.js.html`; the separator is now prepended, and a leading `/`, or surrounding whitespace, is tolerated

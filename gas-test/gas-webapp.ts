@@ -11,7 +11,7 @@ const httpEvent = (route: string): GoogleAppsScript.Events.DoGet =>
 
 const createTestApp = (): GasWebApp => {
   const app = new GasWebApp();
-  app.get('ping', () => ({ pong: true }));
+  app.get('ping', (_req, res) => res.json({ pong: true }));
   return app;
 };
 
@@ -84,7 +84,7 @@ const postEvent = (
 
 const createEchoApp = (): GasWebApp => {
   const app = new GasWebApp();
-  app.post('echo', (request) => ({ body: request.body }));
+  app.post('echo', (req, res) => res.json({ body: req.body }));
   return app;
 };
 
@@ -126,16 +126,14 @@ test('HTTP request body is parsed by content type', () => {
   );
 });
 
-test('an HtmlResponse over RPC is rejected, and over HTTP served as HTML', () => {
+test('res.render over RPC is rejected, and over HTTP served as HTML', () => {
   const app = new GasWebApp();
-  app.get(
-    'page',
-    () => new HtmlResponse(HtmlService.createHtmlOutput('<p>x</p>')),
-  );
+  app.get('page', (_req, res) => res.send('<p>x</p>'));
+  app.get('view', (_req, res) => res.render('page', { layout: null }));
 
   let message: string | undefined;
   try {
-    app.doGet(rpcEvent('page'));
+    app.doGet(rpcEvent('view'));
   } catch (error) {
     message = error instanceof Error ? error.message : String(error);
   }
@@ -144,8 +142,8 @@ test('an HtmlResponse over RPC is rejected, and over HTTP served as HTML', () =>
 
   const output = app.doGet(
     httpEvent('page'),
-  ) as GoogleAppsScript.HTML.HtmlOutput;
-  assert(output.getContent() === '<p>x</p>', 'HTTP should serve the HTML');
+  ) as GoogleAppsScript.Content.TextOutput;
+  assert(output.getContent() === '<p>x</p>', 'HTTP should serve the text');
 });
 
 test('resolveStaticFilePath tolerates a missing or extra leading slash', () => {
@@ -160,10 +158,12 @@ test('resolveStaticFilePath tolerates a missing or extra leading slash', () => {
 });
 
 test('auth middleware identifies the real signed-in user', () => {
-  const run = createAuthMiddleware({ isAuthorized: () => false })(() => 'ok');
+  const run = createAuthMiddleware({ isAuthorized: () => false });
   let message: string | undefined;
   try {
-    run({} as RouteRequest);
+    run({} as GasWebAppRequest, new GasWebAppResponse('rpc', () => ''), () => {
+      throw new Error('should not continue');
+    });
   } catch (error) {
     message = error instanceof Error ? error.message : String(error);
   }
@@ -181,9 +181,78 @@ test('concurrency limiter releases its slot against the real services', () => {
     lockScope: 'script',
     keyFn: () => key,
   });
-  const request = {} as RouteRequest;
+  const req = {} as GasWebAppRequest;
+  const res = new GasWebAppResponse('rpc', () => '');
+  const calls: string[] = [];
 
-  assert(limiter(() => 'a')(request) === 'a', 'first call should pass');
-  assert(limiter(() => 'b')(request) === 'b', 'slot should have been released');
+  limiter(req, res, () => calls.push('a'));
+  limiter(req, res, () => calls.push('b'));
+
+  assert(calls.join() === 'a,b', 'the slot should have been released');
   CacheService.getScriptCache().remove(`concurrency:${key}`);
+});
+
+test('a request runs through nested routers, a path param and error middleware', () => {
+  const app = new GasWebApp();
+  const users = new GasWebAppRouter();
+  const api = new GasWebAppRouter();
+
+  users.get('/:id', (req, res) => {
+    if (req.params.id === '0') throw new GasNotFoundError('No such user');
+    res.json({ id: req.params.id, base: req.baseUrl, path: req.path });
+  });
+  api.use('/users', users);
+  app.use('/api', api);
+  app.use(
+    (
+      err: unknown,
+      _req: GasWebAppRequest,
+      res: GasWebAppResponse,
+      next: GasWebAppNext,
+    ) => {
+      if (err instanceof GasNotFoundError) {
+        res.status(404).json({ missing: err.message });
+        return;
+      }
+      next(err);
+    },
+  );
+
+  const found = app.doGet(rpcEvent('/api/users/42')) as SuccessPayload;
+  assert(
+    JSON.stringify(found) ===
+      JSON.stringify({
+        ok: true,
+        status: 200,
+        data: { id: '42', base: '/api/users', path: '/42' },
+      }),
+    `unexpected payload: ${JSON.stringify(found)}`,
+  );
+
+  const missing = app.doGet(rpcEvent('/api/users/0')) as SuccessPayload;
+  assert(
+    missing.status === 404 &&
+      JSON.stringify(missing.data) === '{"missing":"No such user"}',
+    `error middleware should answer: ${JSON.stringify(missing)}`,
+  );
+
+  let message: string | undefined;
+  try {
+    app.doGet(rpcEvent('/api/users'));
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  assert(message !== undefined, 'expected the unmatched request to throw');
+  assert(JSON.parse(message).error === 'Cannot GET /api/users', message);
+});
+
+test('a POST with _method=DELETE is dispatched as DELETE', () => {
+  const app = new GasWebApp();
+  app.delete('/items/:id', (req, res) => res.json(req.params.id));
+
+  const result = app.doPost({
+    parameter: { route: '/items/7', _method: 'delete' },
+  } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+
+  assert(result.data === '7', `unexpected payload: ${JSON.stringify(result)}`);
 });

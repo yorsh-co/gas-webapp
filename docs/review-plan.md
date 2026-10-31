@@ -282,37 +282,37 @@ Only code that Phase 4 keeps is touched; router and logging defects are fixed by
 
 Branch: `feature/express-router`. Closes R1–R5, X1, X3, X5, X6 (server side), L4. Breaking.
 
-- [ ] One ordered layer stack per router: `use`, `get`, `post`, `put`, `patch`, `delete` and `all` run in registration order (X1).
-- [ ] Path matching with `:param`, optional segments and `*`, compiled once at registration, with no external dependency (X3).
-- [ ] Sub-routers mounted by reference, so routes added later are live (R3).
-- [ ] Root mounting and root prefixes behave like Express (R1, R2).
-- [ ] `(req, res, next)` dispatch with synchronous `next()`, `next(err)` and `next('route')` (X5).
-- [ ] Thrown errors and `next(err)` reach `(err, req, res, next)` middleware; gas-error is the default final error handler.
-- [ ] Final handler: no matching path is a 404; a path matched under another method is a 405 (R5).
-- [ ] Final handler: a matched route that finishes without responding is a 500 naming the route, not a 404.
-- [ ] Registering the same method and path twice throws at registration (R4).
-- [ ] `req` and `res` per the Target API, mutated in place so enrichment reaches outer middleware and the final handler (L4).
-- [ ] Method override: `_method` on `doPost` maps to PUT, PATCH or DELETE; any other value is a 400 (X6).
-- [ ] `json()` and `render()` move from `GasWebApp` to `res`; `GasWebApp` keeps its entry points and template helpers.
-- [ ] Unit tests ported from the Express router cases in scope.
-- [ ] Test fixture: magb.kpis's `app.ts` routing rewritten against the new API routes the way its comments intended (that repo is not changed).
-- [ ] Apps Script test: a request through nested routers, path params and error middleware, end to end.
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated, under a breaking-change note.
+- [x] One ordered layer stack per router: `use`, `get`, `post`, `put`, `patch`, `delete` and `all` run in registration order (X1).
+- [x] Path matching with `:param`, optional segments and `*`, compiled once at registration, with no external dependency (X3).
+- [x] Sub-routers mounted by reference, so routes added later are live (R3).
+- [x] Root mounting and root prefixes behave like Express (R1, R2).
+- [x] `(req, res, next)` dispatch with synchronous `next()`, `next(err)` and `next('route')` (X5).
+- [x] Thrown errors and `next(err)` reach `(err, req, res, next)` middleware; gas-error is the default final error handler.
+- [x] Final handler: no matching path, or a path matched under another method, is a 404 reading `Cannot METHOD /path` (R5); `gas-error` has no 405.
+- [x] Final handler: a matched route that finishes without responding is a 500 naming the route, not a 404.
+- [x] Registering the same method and path twice stacks the handlers, as in Express, instead of overwriting the first (R4).
+- [x] `req` and `res` per the Target API, mutated in place so enrichment reaches outer middleware and the final handler (L4).
+- [x] Method override: `_method` on `doPost` maps to PUT, PATCH or DELETE; any other value is a 400 (X6).
+- [x] `json()` and `render()` move from `GasWebApp` to `res`; `GasWebApp` keeps its entry points and template helpers.
+- [x] Unit tests ported from the Express router cases in scope.
+- [x] Test fixture: magb.kpis's `app.ts` routing rewritten against the new API routes the way its comments intended (that repo is not changed).
+- [x] Built-in middleware ported to `(req, res, next)` so `develop` stays green; auth sets `req.user = { email }` (moved from Phase 5).
+- [x] Apps Script test: a request through nested routers, path params and error middleware, end to end.
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated, under a breaking-change note.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 5: built-in middleware and responses on the new API
 
 Branch: `feature/express-middleware`. Closes M3, X4, X7.
 
-- [ ] Port `createAckTracker` to `(req, res, next)`.
-- [ ] Port `createAuthMiddleware`; it sets `req.user = { email }`, and the placeholder `session` field and in-code TODO are removed.
-- [ ] Port `createRateLimiter` and `createConcurrencyLimiter`.
-- [ ] Port `createLoggingMiddleware`: it reads `res` after `next()` returns (status, duration, transport) (M3).
+- [x] Signature port of `createAckTracker`, `createAuthMiddleware` (`req.user`), `createRateLimiter`, `createConcurrencyLimiter` and `createLoggingMiddleware` moved into Phase 4.
+- [ ] Logging reports the status of errors, which are only serialised after the stack (the final error handler runs after `next()` returns), so an errored request logs `res.statusCode` 200 today (M3).
 - [ ] Errors are logged once, by the error handler (M3).
 - [ ] Logged parameters pass through a configurable redaction list (M3).
 - [ ] Rate limiter defaults to `lockScope: 'user'`; the scope rule and the `'script'` throughput cost are documented (X7).
+- [ ] `res.status(>= 400).json(data)` sends a gas-error-shaped envelope (`ok: false`, `code` derived from the status as gas-error does, `error` from `data.message` when it is a string, otherwise a generic message; `data` as `details`) and is thrown over RPC, so the browser client rejects it like any other error. Today it sends `ok: true` and the client resolves.
 - [ ] `res.render` merges `app.locals` and `res.locals` into the template (X4).
 - [ ] `res.redirect` as an HTTP-only top-window navigation (X4, P2).
 - [ ] Optional HTML error view for page routes, falling back to the JSON envelope (X4).

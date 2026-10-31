@@ -8,7 +8,7 @@ import { createMocks, type MockOptions, type Mocks } from './mocks';
 /** Loose, test-side view of the globals the library defines. */
 export interface GasWebAppGlobals {
   GasWebApp: new (config?: object) => GasWebAppInstance;
-  GasWebAppRouter: new () => object;
+  GasWebAppRouter: new () => GasWebAppRouterInstance;
   createAckTracker: unknown;
   createAuthMiddleware: unknown;
   createConcurrencyLimiter: unknown;
@@ -16,16 +16,51 @@ export interface GasWebAppGlobals {
   createRateLimiter: unknown;
 }
 
+/** Loose, test-side view of a `GasWebAppRouter` instance. */
+export interface GasWebAppRouterInstance {
+  use(...args: unknown[]): this;
+  get(path: string, ...fns: unknown[]): this;
+  post(path: string, ...fns: unknown[]): this;
+  put(path: string, ...fns: unknown[]): this;
+  patch(path: string, ...fns: unknown[]): this;
+  delete(path: string, ...fns: unknown[]): this;
+  all(path: string, ...fns: unknown[]): this;
+}
+
 /** Loose, test-side view of a `GasWebApp` instance. */
-export interface GasWebAppInstance {
-  get(route: string, ...fns: unknown[]): void;
-  post(route: string, ...fns: unknown[]): void;
-  use(...args: unknown[]): void;
+export interface GasWebAppInstance extends GasWebAppRouterInstance {
   doGet(e: object): unknown;
   doPost(e: object): unknown;
-  render(view: string, options?: object): unknown;
   resolveStaticFilePath(type: 'html' | 'js' | 'css', path: string): string;
 }
+
+/** Loose, test-side view of the request handed to handlers. */
+export interface TestRequest {
+  method: string;
+  path: string;
+  originalPath: string;
+  baseUrl: string;
+  params: Record<string, string>;
+  query: Record<string, string>;
+  body: unknown;
+  id: string;
+  transport: 'http' | 'rpc';
+  user?: { email: string };
+  [key: string]: unknown;
+}
+
+/** Loose, test-side view of the response handed to handlers. */
+export interface TestResponse {
+  statusCode: number;
+  sent: boolean;
+  locals: Record<string, unknown>;
+  status(code: number): TestResponse;
+  json(data: unknown): void;
+  send(body: unknown): void;
+  render(view: string, options?: object): void;
+}
+
+export type TestNext = (err?: unknown) => void;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
