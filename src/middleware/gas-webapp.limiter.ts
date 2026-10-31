@@ -27,47 +27,44 @@ const GAS_WEBAPP_DEFAULT_LOCK_SERVICE: GasWebAppLockService = Object.freeze({
  * baked into the cache key, so expiry happens for free via CacheService's
  * TTL — no separate cleanup job needed.
  */
-const createRateLimiter = (config: RateLimitConfig): Middleware => {
+const createRateLimiter = (config: RateLimitConfig): GasWebAppHandler => {
   const lockService = config.lockService ?? GAS_WEBAPP_DEFAULT_LOCK_SERVICE;
 
-  return (next: Handler): Handler =>
-    (request: RouteRequest) => {
-      const cache = CacheService.getScriptCache();
-      const windowBucket = Math.floor(
-        Date.now() / (config.windowSeconds * 1000),
+  return (req, _res, next) => {
+    const cache = CacheService.getScriptCache();
+    const windowBucket = Math.floor(Date.now() / (config.windowSeconds * 1000));
+    const key = `ratelimit:${config.keyFn(req)}:${windowBucket}`;
+
+    const windowEndMs = (windowBucket + 1) * config.windowSeconds * 1000;
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((windowEndMs - Date.now()) / 1000),
+    );
+
+    const lock = lockService.getLock(config.lockScope);
+    if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
+      throw new GasRateLimitError(
+        'Too many requests — try again',
+        retryAfterSeconds,
       );
-      const key = `ratelimit:${config.keyFn(request)}:${windowBucket}`;
+    }
 
-      const windowEndMs = (windowBucket + 1) * config.windowSeconds * 1000;
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((windowEndMs - Date.now()) / 1000),
+    let count: number;
+    try {
+      count = Number(cache.get(key) || '0') + 1;
+      cache.put(key, String(count), config.windowSeconds);
+    } finally {
+      lock.releaseLock();
+    }
+
+    if (count > config.limit) {
+      throw new GasRateLimitError(
+        `Too many requests (${config.limit}/${config.windowSeconds}s)`,
+        retryAfterSeconds,
       );
-
-      const lock = lockService.getLock(config.lockScope);
-      if (!lock || !lock.tryLock(RATE_LIMITER_LOCK_TIMEOUT_MS)) {
-        throw new GasRateLimitError(
-          'Too many requests — try again',
-          retryAfterSeconds,
-        );
-      }
-
-      let count: number;
-      try {
-        count = Number(cache.get(key) || '0') + 1;
-        cache.put(key, String(count), config.windowSeconds);
-      } finally {
-        lock.releaseLock();
-      }
-
-      if (count > config.limit) {
-        throw new GasRateLimitError(
-          `Too many requests (${config.limit}/${config.windowSeconds}s)`,
-          retryAfterSeconds,
-        );
-      }
-      return next(request);
-    };
+    }
+    next();
+  };
 };
 
 /**
@@ -79,7 +76,7 @@ const createRateLimiter = (config: RateLimitConfig): Middleware => {
  */
 const createConcurrencyLimiter = (
   config: ConcurrencyLimitConfig,
-): Middleware => {
+): GasWebAppHandler => {
   const lockService = config.lockService ?? GAS_WEBAPP_DEFAULT_LOCK_SERVICE;
 
   const adjust = (
@@ -107,23 +104,22 @@ const createConcurrencyLimiter = (
     }
   };
 
-  return (next: Handler): Handler =>
-    (request: RouteRequest) => {
-      const key = `concurrency:${config.keyFn(request)}`;
-      const lock = lockService.getLock(config.lockScope);
+  return (req, _res, next) => {
+    const key = `concurrency:${config.keyFn(req)}`;
+    const lock = lockService.getLock(config.lockScope);
 
-      const after = adjust(key, lock, +1);
-      if (after > config.limit) {
-        adjust(key, lock, -1); // undo our own increment before failing
-        throw new GasRateLimitError(
-          `Too many concurrent requests (max ${config.limit})`,
-        );
-      }
+    const after = adjust(key, lock, +1);
+    if (after > config.limit) {
+      adjust(key, lock, -1); // undo our own increment before failing
+      throw new GasRateLimitError(
+        `Too many concurrent requests (max ${config.limit})`,
+      );
+    }
 
-      try {
-        return next(request);
-      } finally {
-        adjust(key, lock, -1);
-      }
-    };
+    try {
+      next();
+    } finally {
+      adjust(key, lock, -1);
+    }
+  };
 };

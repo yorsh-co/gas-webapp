@@ -23,7 +23,8 @@ Routes and middleware are registered through `get`, `post`, and `use` methods on
 - Middleware chain composition, with global (`use(mw)`) or path-prefixed (`use('/api', mw)`) scoping
 - Built-in middleware factories: request logging, an injectable-policy auth check, request rate/concurrency limiting with a configurable lock scope and optional injected lock service, and `google.script.run` delivery acknowledgement
 - Centralized error handling — thrown `GasError` subclasses are caught and serialized consistently instead of crashing the request
-- Response helpers (`json`, `render`) and template helpers (`include`, `js`, `css`, `html`) for `HtmlService`-based views, with configurable static asset directories/extensions
+- Express-style `(req, res, next)` handlers and middleware, error middleware, `:param`/`*wildcard`/`{optional}` paths, and `put`/`patch`/`delete` through a method override
+- Response helpers (`res.json`, `res.send`, `res.render`) and template helpers (`include`, `js`, `css`, `html`) for `HtmlService`-based views, with configurable static asset directories/extensions
 - Written in TypeScript; ships compiled `.js` plus matching `.d.ts` files, so no build step is required to consume it, TS or not
 - No external dependencies beyond built-in Apps Script services and its own peer packages (see [Peer Dependencies](#peer-dependencies))
 
@@ -43,16 +44,16 @@ webApp.use(
   }),
 );
 
-webApp.get('/api/users', (request) => {
-  return usersTable.find();
+webApp.get('/api/users/:id', (req, res) => {
+  res.json(usersTable.get(req.params.id));
 });
 
-webApp.post('/api/users', (request) => {
-  return usersTable.insert(request.body);
+webApp.post('/api/users', (req, res) => {
+  res.status(201).json(usersTable.insert(req.body));
 });
 
-webApp.get('/', (request) => {
-  return webApp.render('Home', { layout: 'Layout' });
+webApp.get('/', (req, res) => {
+  res.render('Home', { layout: 'Layout' });
 });
 
 const doGet = webApp.doGet;
@@ -139,7 +140,7 @@ See the [Deployment](#deployment) section above.
 ```js
 const webApp = new GasWebApp();
 
-webApp.get('/', (request) => webApp.json({ ok: true }));
+webApp.get('/', (req, res) => res.json({ ok: true }));
 
 const doGet = webApp.doGet;
 const doPost = webApp.doPost;
@@ -254,7 +255,7 @@ See the [Deployment](#deployment) section above.
 ```js
 const webApp = new GasWebApp();
 
-webApp.get('/', (request) => webApp.json({ ok: true }));
+webApp.get('/', (req, res) => res.json({ ok: true }));
 
 const doGet = webApp.doGet;
 const doPost = webApp.doPost;
@@ -265,7 +266,7 @@ const doPost = webApp.doPost;
 ```js
 webApp.use(createLoggingMiddleware());
 
-webApp.get('/api/users', (request) => usersTable.find());
+webApp.get('/api/users', (req, res) => res.json(usersTable.find()));
 ```
 
 ## Basic Usage
@@ -302,9 +303,36 @@ const doPost = webApp.doPost;
 ### Register a Route
 
 ```js
-webApp.get('/api/users', (request) => usersTable.find());
-webApp.post('/api/users', (request) => usersTable.insert(request.body));
+webApp.get('/api/users', (req, res) => res.json(usersTable.find()));
+webApp.get('/api/users/:id', (req, res) =>
+  res.json(usersTable.get(req.params.id)),
+);
+webApp.post('/api/users', (req, res) =>
+  res.status(201).json(usersTable.insert(req.body)),
+);
+webApp.put('/api/users/:id', (req, res) =>
+  res.json(usersTable.update(req.params.id, req.body)),
+);
+webApp.delete('/api/users/:id', (req, res) =>
+  res.json(usersTable.remove(req.params.id)),
+);
 ```
+
+Handlers are `(req, res, next)` functions. Their return value is ignored: a route responds only through `res`.
+
+Paths follow Express 5: `:name` matches one segment, `*name` the rest of the path including slashes, and `{...}` is optional (`/users{/:id}`). Matching is case-insensitive, a trailing slash is optional, and parameters are URI-decoded. Parameters arrive as strings in `req.params`; the request's other parameters are in `req.query`.
+
+`get`, `post`, `put`, `patch`, `delete` and `all` (every method) take any number of handlers. Registering the same method and path twice stacks the handlers, as in Express: the second runs only if the first calls `next()`.
+
+`req` is an interface, so an app adds fields by declaration merging in global scope:
+
+```ts
+interface GasWebAppRequest {
+  tenant?: string;
+}
+```
+
+PUT, PATCH and DELETE reach `doPost` as a POST carrying `_method=PUT|PATCH|DELETE`; `req.method` reports the effective method. Any other `_method` is a 400, and `_method` is ignored on GET.
 
 ### Route requests from the client
 
@@ -326,10 +354,10 @@ google.script.run
 ### Add Middleware
 
 ```js
-// applies to every route
+// applies to every route registered after it
 webApp.use(createLoggingMiddleware(gasLogger));
 
-// applies only to routes under /api
+// applies only to paths under /api
 webApp.use(
   '/api',
   createAuthMiddleware({
@@ -344,11 +372,19 @@ webApp.post(
     limit: 5,
     windowSeconds: 60,
     lockScope: 'user',
-    keyFn: (request) => request.email,
+    keyFn: (req) => req.user.email,
   }),
-  (request) => usersTable.insert(request.body),
+  (req, res) => res.json(usersTable.insert(req.body)),
 );
+
+// your own
+webApp.use((req, res, next) => {
+  req.tenant = tenantOf(req.user.email);
+  next();
+});
 ```
+
+Middleware calls `next()` to continue, `next(err)` to skip to the error handlers, or `next('route')` to skip the rest of the current route. `next()` is synchronous: it returns once everything downstream has finished, so a middleware can read `res.statusCode` after calling it. There is no async middleware (Apps Script rejects `async`/`await`).
 
 > **Note:**
 > When `createRateLimiter` rejects a request for exceeding the window count, the `GasRateLimitError` it throws carries `details.retryAfterSeconds` — the number of seconds until that window rolls over — so callers can back off precisely instead of guessing. Rejections from lock contention (a rare race, not a limit being hit) do not carry this, since a 1-second retry is the reasonable default there. `createConcurrencyLimiter` never sets it either: a concurrency slot frees when some other in-flight execution finishes, which the limiter has no way to estimate.
@@ -365,7 +401,7 @@ webApp.use(
     windowSeconds: 60,
     lockScope: 'script',
     lockService: GasLock,
-    keyFn: (request) => `route:${request.method}:${request.route}`,
+    keyFn: (req) => `route:${req.method}:${req.originalPath}`,
   }),
 );
 ```
@@ -382,13 +418,14 @@ Omitted, both resolve `LockService.getScriptLock()`/`getUserLock()` directly —
 ```js
 const ackTracker = createAckTracker(); // { ttlSeconds: 60 } by default
 
-// first — ahead of auth and rate limiting, so a request that arrives and is
-// then rejected (401, 429, etc.) is still acknowledged
-webApp.use(ackTracker.middleware);
-
-// outside any rate-limited prefix — this route is polled while other
-// requests are in flight, and would otherwise consume their rate budget
+// the ack route first, so the middleware registered below does not apply to
+// it: it is polled while other requests are in flight, and would otherwise
+// consume their rate budget
 webApp.get('/ack', ackTracker.handler);
+
+// ahead of auth and rate limiting, so a request that arrives and is then
+// rejected (401, 429, etc.) is still acknowledged
+webApp.use(ackTracker.middleware);
 
 webApp.use('/api', createAuthMiddleware({ isAuthorized }));
 webApp.use(
@@ -397,12 +434,12 @@ webApp.use(
     limit: 100,
     windowSeconds: 60,
     lockScope: 'script',
-    keyFn: (request) => `route:${request.method}:${request.route}`,
+    keyFn: (req) => `route:${req.method}:${req.originalPath}`,
   }),
 );
 ```
 
-`ackTracker.handler` expects a `callIds` parameter (comma-separated) and returns the subset that were found — each one is deleted from the cache as it's reported, so a given `callId` is only ever reported once.
+`ackTracker.handler` expects a `callIds` parameter (comma-separated) and responds with the subset that were found — each one is deleted from the cache as it's reported, so a given `callId` is only ever reported once.
 
 > **Note:**
 > `callId` is a correlation token, not a credential. It's never used for authorization, and because it's client-supplied it's validated against a UUID pattern before it's used as a cache key. Treat it as a hint that a request arrived, not proof of anything about who sent it.
@@ -412,34 +449,27 @@ webApp.use(
 ```js
 const apiRouter = new GasWebAppRouter();
 
-apiRouter.get('/users', (request) => usersTable.find());
+apiRouter.get('/users/:id', (req, res) =>
+  res.json(usersTable.get(req.params.id)),
+);
 
 webApp.use('/api', apiRouter);
 ```
 
-### Return JSON
+Routers are mounted by reference, so routes added to `apiRouter` later are live. Inside a mounted router `req.baseUrl` is the mount path and `req.path` is relative to it; `req.originalPath` is always the full path. `use('/')` or `use(router)` with no path mounts at the root. Each layer sees only its own `req.params`.
+
+### Respond
 
 ```js
-webApp.get('/api/users', (request) => {
-  return webApp.json(usersTable.find());
-});
+res.json(usersTable.find()); // { ok: true, status: 200, data }
+res.status(201).json(created); // status travels in the envelope
+res.send('plain text'); // text over HTTP; the envelope's data over RPC
+res.render('Home', { layout: 'Layout', pageTitle: 'Dashboard' });
 ```
 
-> **Note:**
-> Returning a plain value from a handler is equivalent to wrapping it in `webApp.json(...)` — `GasWebApp` does this automatically for any handler result that isn't already a `json`/`render` response.
+Apps Script cannot set an HTTP status, so `res.status()` sets the status in the success envelope. A response is sent once: a second `json`, `send` or `render` throws `Response already sent`. Set `res.locals` in middleware to pass data to every `render`.
 
-### Render a View
-
-```js
-webApp.get('/', (request) => {
-  return webApp.render('Home', { layout: 'Layout', pageTitle: 'Dashboard' });
-});
-```
-
-`render` resolves both the view and the layout through the configured `html` static dir, exactly like `webApp.html()` — `'Home'` becomes `dist/web/views/Home.html` by default — so pass logical names, not full paths.
-
-> **Note:**
-> Omit `layout`, or pass `layout: null`, to render the view standalone, with no layout.
+`render` resolves both the view and the layout through the configured `html` static dir, exactly like `webApp.html()` — `'Home'` becomes `dist/web/views/Home.html` by default — so pass logical names, not full paths. Omit `layout`, or pass `layout: null`, to render the view standalone. Rendering works only over a real HTTP request; over `google.script.run` it throws `GasForbiddenError`.
 
 ### Template Helpers
 
@@ -458,26 +488,43 @@ Each resolves against the configured `static` dirs/extensions — e.g. `webApp.j
 
 ### Request Lifecycle
 
-1. `doGet`/`doPost` normalizes the raw event into a `RouteRequest` (route, method, params, body, a generated `reqId`, and whether it's a real HTTP request or a `google.script.run` call). A POST body is parsed by its `postData.type`: `application/json` (parameters such as `; charset=utf-8` allowed) is parsed, and a malformed body is a 400; `application/x-www-form-urlencoded` and `multipart/form-data` leave `request.body` undefined, as their fields are in `request.params`; any other type is passed through as the raw string.
-2. The request is dispatched through the matched route's middleware chain, then its handler.
-3. The result is serialized: real HTTP requests get a `ContentService`/`HtmlService` output; `google.script.run` calls get the plain payload.
+1. `doGet`/`doPost` normalizes the raw event into a `req` (`method`, `path`, `query`, `body`, a generated `id`, and the `transport`: a real `'http'` request or a `google.script.run` `'rpc'` call). The route comes from the `route` parameter. A POST body is parsed by its `postData.type`: `application/json` (parameters such as `; charset=utf-8` allowed) is parsed, and a malformed body is a 400; `application/x-www-form-urlencoded` and `multipart/form-data` leave `req.body` undefined, as their fields are in `req.query`; any other type is passed through as the raw string.
+2. The request runs through the router's layer stack in registration order.
+3. The response is serialized: real HTTP requests get a `ContentService`/`HtmlService` output; `google.script.run` calls get the plain payload.
+
+A request nothing answers is a 404 reading `Cannot GET /path`, whatever the method (there is no 405). A handler that returns without responding and without calling `next` is a 500 reading `Route did not respond: GET /path`.
 
 ### Error Handling
 
-Handlers and middleware can throw any `GasError` subclass (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`, from the `gas-error` peer package). `GasWebApp` catches these via `GasError.handle` and serializes them consistently instead of letting them crash the request — for both transports. Every failure takes this one path and is logged once, including a malformed request body and an `HtmlResponse` returned over `google.script.run`. Real HTTP requests receive the error envelope as JSON text output; `google.script.run` calls receive an `Error` whose message is that JSON.
+A handler or middleware that throws, or calls `next(err)`, skips to the next error handler: a function with four parameters, as in Express.
 
-`createAuthMiddleware` rejects with a `GasUnauthorizedError` (401) in two cases, with fixed messages that never echo the email: `Unable to identify the signed-in user` when `Session` throws or returns an empty email (scope declined, or a consumer account under **Execute as: Me**), and `Not authorized` when `isAuthorized` returns false.
+```js
+webApp.use((err, req, res, next) => {
+  if (err instanceof GasConflictError) {
+    return res.status(409).json({ conflict: err.message });
+  }
+  next(err); // pass it on
+});
+```
+
+While an error is pending, only error handlers run. Without one, the error reaches `GasError.handle` (the `gas-error` peer), which serializes it consistently for both transports: `GasError` subclasses (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`) keep their status and message, anything else becomes a generic 500. Every failure takes this one path and is logged once, including a malformed request body. Real HTTP requests receive the error envelope as JSON text output; `google.script.run` calls receive an `Error` whose message is that JSON. The user in `req.user`, when auth set one, is logged as the session.
+
+`createAuthMiddleware` sets `req.user = { email }`. It rejects with a `GasUnauthorizedError` (401) in two cases, with fixed messages that never echo the email: `Unable to identify the signed-in user` when `Session` throws or returns an empty email (scope declined, or a consumer account under **Execute as: Me**), and `Not authorized` when `isAuthorized` returns false.
 
 ### Middleware Execution Order
 
-- `use(middleware)` — applies to every route.
-- `use(prefix, ...middlewares)` — applies only to routes equal to, or nested under, `prefix`.
-- `use(prefix, subRouter)` — mounts a `GasWebAppRouter`'s routes and middleware under `prefix`.
-- Middleware registered per-route (as extra arguments to `get`/`post`) runs innermost, after all matching `use()` middleware.
+Layers run in the order they were registered, whatever their kind:
+
+- `use(...handlers)` — applies to every path from this point on.
+- `use(prefix, ...handlers)` — applies to paths equal to, or nested under, `prefix`, on segment boundaries (`/api` matches `/api/users` but not `/apiary`).
+- `use(prefix, router)` — mounts a `GasWebAppRouter`.
+- `get`/`post`/`put`/`patch`/`delete`/`all` — a route; its own handlers run in order.
+
+A route registered before a `use()` is not affected by it, which is how a route such as `/ack` stays out of later middleware.
 
 ### Dual Transport
 
-Every route works over both a real HTTP request and `google.script.run`, using the same handler. `HtmlResponse` results (from `render`) can only be returned over a real HTTP request — returning one from a `google.script.run` call throws `GasForbiddenError`.
+Every route works over both a real HTTP request and `google.script.run`, using the same handler. `res.render` works only over a real HTTP request; over `google.script.run` it throws `GasForbiddenError`.
 
 ## Planned features
 

@@ -41,23 +41,23 @@ const createAckTracker = (
   const cacheKey = (callId: string): string =>
     `${GAS_WEBAPP_ACK_KEY_PREFIX}:${callId}`;
 
-  const middleware: Middleware = (next) => (request) => {
-    const callId = request.params.callId;
+  const middleware: GasWebAppHandler = (req, _res, next) => {
+    const callId = req.query.callId;
 
     if (callId && isValidCallId(callId)) {
       CacheService.getScriptCache().put(cacheKey(callId), '1', ttlSeconds);
     }
 
-    return next(request);
+    next();
   };
 
-  const handler: Handler<string[]> = (request) => {
-    const callIds = (request.params.callIds || '')
+  const handler: GasWebAppHandler = (req, res) => {
+    const callIds = (req.query.callIds || '')
       .split(',')
       .filter(isValidCallId)
       .slice(0, GAS_WEBAPP_ACK_MAX_CALL_IDS);
 
-    if (callIds.length === 0) return [];
+    if (callIds.length === 0) return res.json([]);
 
     const cache = CacheService.getScriptCache();
     const found = cache.getAll(callIds.map(cacheKey));
@@ -67,7 +67,7 @@ const createAckTracker = (
       cache.removeAll(arrived.map(cacheKey));
     }
 
-    return arrived;
+    res.json(arrived);
   };
 
   return { middleware, handler };

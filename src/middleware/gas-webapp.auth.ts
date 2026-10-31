@@ -1,5 +1,4 @@
 /**
- * TODO:
  * Auth middleware factory.
  *
  * Resolves the active user's email via Session, rejecting the request with a
@@ -8,7 +7,7 @@
  * authorization decision to the injected `isAuthorized` check — same
  * pattern as `keyFn` on the rate limiters: the mechanism is generic, the
  * app-specific policy (an allow-list, a Sheet lookup, etc.) is supplied
- * by the consumer.
+ * by the consumer. The identified user is set on `req.user`.
  *
  * Usage:
  *   webApp.use(createAuthMiddleware({
@@ -18,9 +17,8 @@
  * Peer dependency: GasUnauthorizedError (gas-error).
  */
 const createAuthMiddleware =
-  (config: AuthMiddlewareConfig): Middleware =>
-  (next: Handler): Handler =>
-  (request) => {
+  (config: AuthMiddlewareConfig): GasWebAppHandler =>
+  (req, _res, next) => {
     let email = '';
     try {
       email = Session.getActiveUser().getEmail();
@@ -36,7 +34,6 @@ const createAuthMiddleware =
       throw new GasUnauthorizedError('Not authorized');
     }
 
-    // TODO: add optional session management using gas-webapp.session (still to be constructed)
-
-    return next({ ...request, email, session: { email } });
+    req.user = { email };
+    next();
   };

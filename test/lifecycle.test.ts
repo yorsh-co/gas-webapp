@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadGasWebApp } from './harness';
+import { loadGasWebApp, type TestRequest, type TestResponse } from './harness';
 
 interface Output {
   getContent(): string;
@@ -29,7 +29,9 @@ const thrownEnvelope = (fn: () => unknown): Record<string, unknown> => {
 const setup = (views: Record<string, string> = {}) => {
   const { lib, mocks } = loadGasWebApp({ views });
   const app = new lib.GasWebApp({ logger: mocks.console });
-  app.post('echo', (request: { body: unknown }) => ({ body: request.body }));
+  app.post('echo', (req: TestRequest, res: TestResponse) =>
+    res.json({ body: req.body }),
+  );
   return { app, mocks };
 };
 
@@ -109,9 +111,11 @@ describe('body parsing by content type (L2)', () => {
 });
 
 describe('error path (L3)', () => {
-  it('logs the HtmlResponse-over-RPC rejection once and throws its envelope', () => {
+  it('logs the render-over-RPC rejection once and throws its envelope', () => {
     const { app, mocks } = setup();
-    app.get('page', () => app.render('home', { layout: null }));
+    app.get('page', (_req: TestRequest, res: TestResponse) =>
+      res.render('home', { layout: null }),
+    );
 
     const envelope = thrownEnvelope(() =>
       app.doGet({ parameter: { route: 'page' } }),
@@ -140,6 +144,21 @@ describe('error path (L3)', () => {
   });
 });
 
+/** Renders `view` through `res.render` on a real HTTP request. */
+const renderOver = (
+  app: ReturnType<typeof setup>['app'],
+  view: string,
+  options?: object,
+): Output => {
+  app.get('render', (_req: TestRequest, res: TestResponse) =>
+    res.render(view, options),
+  );
+  return app.doGet({
+    parameter: { route: 'render' },
+    contextPath: '',
+  }) as Output;
+};
+
 describe('render and static paths (L5, L6, L7)', () => {
   const VIEW = 'dist/web/views/home.html';
   const LAYOUT = 'dist/web/views/layouts/main.html';
@@ -151,7 +170,7 @@ describe('render and static paths (L5, L6, L7)', () => {
   ])('renders standalone with %s (L5)', (_name, options) => {
     const { app, mocks } = setup({ [VIEW]: '<p>home</p>' });
 
-    app.render('home', options);
+    renderOver(app, 'home', options);
 
     expect(
       mocks.HtmlService.createTemplateFromFile.mock.calls.map(([n]) => n),
@@ -161,7 +180,7 @@ describe('render and static paths (L5, L6, L7)', () => {
   it('resolves the view and layout through the static dirs (L7)', () => {
     const { app, mocks } = setup({ [VIEW]: '<p>home</p>' });
 
-    app.render('home', { layout: 'layouts/main', title: 'Hi' });
+    renderOver(app, 'home', { layout: 'layouts/main', title: 'Hi' });
 
     expect(
       mocks.HtmlService.createTemplateFromFile.mock.calls.map(([n]) => n),

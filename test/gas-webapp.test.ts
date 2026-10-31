@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadGasWebApp } from './harness';
+import { loadGasWebApp, type TestRequest, type TestResponse } from './harness';
 
 /** Event shaped like a real web app request: `contextPath` is present. */
 const httpEvent = (route: string, extra: object = {}) => ({
@@ -32,8 +32,10 @@ const setup = () => {
   const { lib, mocks } = loadGasWebApp();
   const app = new lib.GasWebApp({ logger: mocks.console });
 
-  app.get('ping', () => ({ pong: true }));
-  app.post('echo', (request: { body: unknown }) => request.body);
+  app.get('ping', (_req: TestRequest, res: TestResponse) =>
+    res.json({ pong: true }),
+  );
+  app.post('echo', (req: TestRequest, res: TestResponse) => res.json(req.body));
   return { app, mocks };
 };
 

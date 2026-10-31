@@ -1,9 +1,9 @@
 /**
  * Types for GasWebApp.
  *
- * GasWebAppRouter and its request/routing contract (RouteRequest, HttpMethod,
- * Handler, Middleware) live in this same package — see gas-router.class.ts
- * and request.types.ts.
+ * GasWebAppRouter and its request/routing contract (GasWebAppRequest,
+ * GasWebAppResponse, GasWebAppHandler) live in this same package — see
+ * gas-webapp.router.class.ts and gas-webapp.router.types.ts.
  *
  * Peer dependency (expected as a global from a sibling subtree package,
  * not redeclared here):
@@ -24,7 +24,7 @@ interface GasWebAppStaticConfig {
 interface GasWebAppConfig {
   /** Passed to GasError.handle for unhandled/operational errors. @default console */
   logger?: GasLogger | typeof console;
-  /** Static asset resolution config for render()/include()/js()/css()/html(). */
+  /** Static asset resolution config for res.render()/include()/js()/css()/html(). */
   static?: GasWebAppStaticConfig;
 }
 
@@ -39,5 +39,3 @@ type WebAppResponse =
   | GoogleAppsScript.HTML.HtmlOutput
   | GoogleAppsScript.Content.TextOutput
   | SuccessPayload;
-
-type AppResponse = JsonResponse | HtmlResponse;

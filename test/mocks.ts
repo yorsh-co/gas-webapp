@@ -6,6 +6,9 @@ export const DEFAULT_EMAIL = 'user@example.com';
 /** Content type `ContentService.MimeType.JSON` resolves to. */
 export const JSON_MIME_TYPE = 'JSON';
 
+/** Content type `ContentService.MimeType.TEXT` resolves to. */
+export const TEXT_MIME_TYPE = 'TEXT';
+
 type Scope = 'script' | 'user';
 
 /** Lock handle returned by the fake, with spies on every method. */
@@ -138,7 +141,7 @@ export function createMocks(options: MockOptions = {}) {
       }),
     },
     ContentService: {
-      MimeType: { JSON: JSON_MIME_TYPE },
+      MimeType: { JSON: JSON_MIME_TYPE, TEXT: TEXT_MIME_TYPE },
       createTextOutput: vi.fn(createTextOutput),
     },
     CacheService: { getScriptCache: vi.fn(() => cache) },

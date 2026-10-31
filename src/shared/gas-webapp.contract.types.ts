@@ -6,7 +6,7 @@
  * Nothing app-specific belongs here.
  */
 
-/** Success envelope produced by `GasWebApp.json()`. */
+/** Success envelope produced by `GasWebAppResponse.json()`. */
 interface SuccessPayload<T = unknown> {
   ok: true;
   status: number;
