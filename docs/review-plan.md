@@ -190,25 +190,7 @@ Deviations from Express, all forced by the platform or the wire contract: the su
 
 #### Manual web app checks
 
-Run once on a test web app deployment of the `gas-test` project (Deploy, New deployment, Web app, execute as you, access: only you or anyone for a throwaway). Let `URL` be the `/exec` URL and `TOKEN=$(gcloud auth print-identity-token)` or, for a private deployment, `-H "Authorization: Bearer $(gcloud auth print-access-token)"`. Use `curl -L` throughout, as Apps Script redirects. The test app needs routes `GET /users/:id`, `POST /echo` and `DELETE /items/:id` returning `req.originalPath`, `req.method`, `req.body`, `req.query` and `req.transport`.
-
-| Check               | Command                                                                               | Expected                                                                |
-| ------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| GET with pathInfo   | `curl -L "$URL/users/42"`                                                             | JSON envelope, `path: /users/42`, `transport: http`                     |
-| GET with route      | `curl -L "$URL?route=/users/42"`                                                      | Same result                                                             |
-| GET with both       | `curl -L "$URL/users/1?route=/users/42"`                                              | `route` wins: `/users/42`                                               |
-| POST with pathInfo  | `curl -L -X POST "$URL/echo" -d x=1`                                                  | 404 `Cannot POST /`: pathInfo is not read on `doPost`                   |
-| POST with route     | `curl -L -X POST "$URL?route=/echo" -d x=1`                                           | Routed to `/echo`; record whether `e.pathInfo` was set on the POST      |
-| POST form body      | `curl -L -X POST "$URL?route=/echo" -d a=1 -d b=2`                                    | `body` undefined, `query` `{a: "1", b: "2"}`                            |
-| POST JSON body      | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: application/json' -d '{"a":1}'` | `body` `{a: 1}`                                                         |
-| POST text body      | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: text/plain' -d hello`           | `body` `"hello"`                                                        |
-| POST malformed JSON | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: application/json' -d '{oops'`   | 400 error envelope, served as JSON                                      |
-| `_method` override  | `curl -L -X POST "$URL?route=/items/7&_method=DELETE"`                                | `method: DELETE`                                                        |
-| Bad `_method`       | `curl -L -X POST "$URL?route=/items/7&_method=TRACE"`                                 | 400 `Invalid _method`                                                   |
-| `_method` on GET    | `curl -L "$URL?route=/users/42&_method=DELETE"`                                       | Ignored: `method: GET`                                                  |
-| contextPath, MIME   | any of the above, `curl -L -i`                                                        | `transport: http`; the envelope is JSON text; record the `Content-Type` |
-
-Record the observed `e.pathInfo` and `e.contextPath` values and the MIME types in the README's platform notes.
+Run on a test web app deployment of the fixture in [`manual/`](../manual/README.md), which holds the setup, the curl commands with expected results, and the browser checks (routing and bodies, `render`, `res.redirect`, error views, the browser client and the ack route). Record the observed `e.pathInfo`, `e.contextPath` and MIME types in the README's platform notes.
 
 - The dedicated Apps Script test project is selected with `GAS_TEST_SCRIPT_ID`. Its ID stays out of the repository, and its contents are replaced on every run.
 - Apps Script tests start in Phase 2 and grow with each phase, instead of arriving at the end, so every backend phase is proven to push and run.
@@ -381,14 +363,21 @@ Branch: `feature/gas-dev-release`. Closes T2, T4.
 
 Branch: `feature/docs-v1`. Closes T3, T5.
 
-- [ ] Rewrite `README.md` for the new API: install with gas-dev-bundle, the route resolution table, method override, error middleware, Express differences, platform limitations P1–P8.
-- [ ] Rewrite `src/web/README.md`: install with subtree or the sync script, `put`/`patch`/`delete`, idempotency keys.
-- [ ] Migration note from the pre-1.0 API, using magb.kpis's `app.ts` as the worked example.
-- [ ] Apps Script test coverage reviewed: every Apps Script service the library calls is exercised at least once.
-- [ ] Delete `docs/gas-suite-integration.md`.
-- [ ] Finalise the CHANGELOG for `v1.0.0`.
+- [x] Rewrite `README.md` for the new API: install with gas-dev-bundle, the route resolution table, method override, error middleware, Express differences, platform limitations P1–P8.
+- [x] Rewrite `src/web/README.md`: install with subtree or the sync script, `put`/`patch`/`delete`, idempotency keys.
+- [x] Migration note from the pre-1.0 API, using magb.kpis's `app.ts` as the worked example.
+- [x] Apps Script test coverage reviewed: every Apps Script service the library calls is exercised at least once.
+- [x] Delete `docs/gas-suite-integration.md`.
+- [x] Finalise the CHANGELOG for `v1.0.0`.
 - [ ] Bump `gas-dev-config` to `^1.5.0` and remove the mirrored `async`/`await` rule, once 1.5.0 is released (manual if not yet released).
 - [ ] Delete this document.
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
 - [ ] Reviewed, committed, merged into `develop`; `release/1.0.0` ready to cut.
+
+## Outstanding manual steps
+
+1. Run the checks in [`manual/README.md`](../manual/README.md) on a throwaway deployment and record the results (`e.pathInfo`, `e.contextPath`, MIME types, the `res.redirect` outcome) in the README's platform notes. This closes the unticked Phase 6 manual check.
+2. Release gas-dev-config 1.5.0, then bump it here to `^1.5.0` and remove the mirrored `async`/`await` rule from `eslint.config.js`.
+3. Cut `release/1.0.0`: version bump, git-flow release, `npm run build:release`, and push the branches and tags.
+4. Delete this document.

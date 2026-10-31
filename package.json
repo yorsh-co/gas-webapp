@@ -55,7 +55,8 @@
     "test:watch": "vitest",
     "typecheck:gas-test": "tsc -p gas-test/tsconfig.json --noEmit && echo \"✓ TypeScript passed (gas-test)\"",
     "test:gas:build": "gas-dev-config gas-test build",
-    "test:gas": "gas-dev-config gas-test run"
+    "test:gas": "gas-dev-config gas-test run",
+    "manual:build": "npm run build && node scripts/build-manual-webapp.js"
   },
   "gasDevConfig": {
     "loadOrder": [
