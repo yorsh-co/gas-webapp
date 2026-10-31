@@ -23,6 +23,8 @@ export interface GasWebAppInstance {
   use(...args: unknown[]): void;
   doGet(e: object): unknown;
   doPost(e: object): unknown;
+  render(view: string, options?: object): unknown;
+  resolveStaticFilePath(type: 'html' | 'js' | 'css', path: string): string;
 }
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));

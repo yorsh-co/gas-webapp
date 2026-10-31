@@ -15,7 +15,7 @@ const rpcEvent = (route: string, extra: object = {}) => ({
 });
 
 const postData = (body: unknown) => ({
-  postData: { contents: JSON.stringify(body) },
+  postData: { contents: JSON.stringify(body), type: 'application/json' },
 });
 
 /** Runs `fn` and returns the parsed error envelope from the thrown message. */

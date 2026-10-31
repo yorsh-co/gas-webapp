@@ -101,7 +101,8 @@ export function createMocks(options: MockOptions = {}) {
 
   const cache = {
     get: vi.fn((key: string): string | null => cacheStore.get(key) ?? null),
-    put: vi.fn((key: string, value: string) => {
+    put: vi.fn((key: string, value: string, ...ttl: number[]) => {
+      void ttl;
       cacheStore.set(key, value);
     }),
     getAll: vi.fn((keys: string[]): Record<string, string> => {
@@ -127,6 +128,9 @@ export function createMocks(options: MockOptions = {}) {
     HtmlService: {
       createHtmlOutput: vi.fn(createHtmlOutput),
       createTemplateFromFile: vi.fn((name: string): MockHtmlTemplate => {
+        if (typeof name !== 'string') {
+          throw new Error('Template file name must be a string');
+        }
         const template: MockHtmlTemplate = {
           evaluate: vi.fn(() => createHtmlOutput(views[name] ?? '')),
         };

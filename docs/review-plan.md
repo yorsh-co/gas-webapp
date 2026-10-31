@@ -258,24 +258,24 @@ Branch: `feature/lifecycle-fixes`. Closes L1, L2, L3, L5, L6, L7, M1, M2, M4, C1
 
 Only code that Phase 4 keeps is touched; router and logging defects are fixed by the rewrite.
 
-- [ ] L1: request normalisation runs inside the error boundary.
-- [ ] L2: body parsed by `postData.type`: JSON parsed, form-encoded left to `e.parameter`, anything else kept as a string.
-- [ ] L3: HTTP errors serialised from `GasError.handle(err, { rethrow: false })`; RPC errors rethrown. Every error, including `_serialize`'s, takes this one path.
-- [ ] L5: `render` without `layout` renders standalone.
-- [ ] L6: `resolveStaticFilePath` prepends the separator and tolerates a leading `/`.
-- [ ] L7: `render` resolves views and layouts through the static dirs.
-- [ ] M1: `createConcurrencyLimiter` uses `config.lockService`.
-- [ ] M2: release retries instead of leaking the slot; the counter TTL covers the 6-minute execution limit.
-- [ ] M4: an empty email, or a throwing `Session` call, is a 401 with a fixed message.
-- [ ] C1: a `null`/`undefined` success value resolves instead of crashing.
-- [ ] C2: non-`ServerError` rejections are normalised through `clientError`.
-- [ ] C3: `route` and `callId` in `params` reject with `CLIENT_ERROR`.
-- [ ] D1–D4: documentation drift corrected.
-- [ ] Each fix above has a unit test that fails without it.
-- [ ] Apps Script tests for L3 (real `ContentService` output) and L5–L7 (real `HtmlService` templates).
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated.
+- [x] L1: request normalisation runs inside the error boundary.
+- [x] L2: body parsed by `postData.type`: JSON parsed, form-encoded left to `e.parameter`, anything else kept as a string.
+- [x] L3: HTTP errors serialised from `GasError.handle(err, { rethrow: false })`; RPC errors rethrown. Every error, including `_serialize`'s, takes this one path.
+- [x] L5: `render` without `layout` renders standalone.
+- [x] L6: `resolveStaticFilePath` prepends the separator and tolerates a leading `/`.
+- [x] L7: `render` resolves views and layouts through the static dirs.
+- [x] M1: `createConcurrencyLimiter` uses `config.lockService`.
+- [x] M2: release retries instead of leaking the slot; the counter TTL covers the 6-minute execution limit.
+- [x] M4: an empty email, or a throwing `Session` call, is a 401 with a fixed message.
+- [x] C1: a `null`/`undefined` success value resolves instead of crashing.
+- [x] C2: non-`ServerError` rejections are normalised through `clientError`.
+- [x] C3: `route` and `callId` in `params` reject with `CLIENT_ERROR`.
+- [x] D1–D4: documentation drift corrected.
+- [x] Each fix above has a unit test that fails without it.
+- [x] Apps Script tests for L3 (real `ContentService` output) and L5–L7 (real `HtmlService` templates).
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 4: Express router core

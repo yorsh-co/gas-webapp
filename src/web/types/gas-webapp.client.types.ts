@@ -8,7 +8,7 @@
 type ApiMethod = 'GET' | 'POST';
 
 interface ApiRequestOptions {
-  /** Merged into `e.parameter` alongside `route`. Values must be strings. */
+  /** Merged into `e.parameter` alongside `route`. Values must be strings; `route` and `callId` are reserved and reject with `CLIENT_ERROR`. */
   params?: Record<string, string>;
   /** POST only — JSON-serialized into `e.postData.contents`. */
   body?: unknown;
@@ -73,7 +73,7 @@ interface GasWebAppClientConfig {
   ackPollTimeoutMs: number;
   /**
    * How long a call may go unacknowledged before it counts as undelivered.
-   * @default 8000
+   * @default 15000
    */
   ackDeadlineMs: number;
   /** Logger scope for ack-watcher diagnostics. @default 'Ack Watcher' */

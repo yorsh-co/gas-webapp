@@ -215,16 +215,16 @@ Add a [`filePushOrder`](https://github.com/google/clasp#filepushorder-optional) 
     "dist/lib/gas-logger/module/gas-logger.constants.js",
     "dist/lib/gas-logger/module/gas-logger.class.js",
 
-    "dist/lib/gas-error/module/gas-error.class.js",
-    "dist/lib/gas-error/module/gas-error.handler.js",
+    "dist/lib/gas-error/gas-error.constants.js",
+    "dist/lib/gas-error/gas-error.js",
 
     "dist/lib/gas-lock/gas-lock.constants.js",
     "dist/lib/gas-lock/gas-lock.js",
 
     "dist/lib/gas-webapp/gas-webapp.response.js",
-    "dist/lib/gas-webapp/module/gas-webapp.router.class.js",
-    "dist/lib/gas-webapp/module/gas-webapp.constants.js",
-    "dist/lib/gas-webapp/module/gas-webapp.class.js"
+    "dist/lib/gas-webapp/gas-webapp.router.class.js",
+    "dist/lib/gas-webapp/gas-webapp.constants.js",
+    "dist/lib/gas-webapp/gas-webapp.class.js"
   ]
 }
 ```
@@ -436,32 +436,37 @@ webApp.get('/', (request) => {
 });
 ```
 
+`render` resolves both the view and the layout through the configured `html` static dir, exactly like `webApp.html()` — `'Home'` becomes `dist/web/views/Home.html` by default — so pass logical names, not full paths.
+
 > **Note:**
-> Pass `layout: null` to render the view standalone, with no layout.
+> Omit `layout`, or pass `layout: null`, to render the view standalone, with no layout.
 
 ### Template Helpers
 
 Call these from inside an `HtmlService` template via the app's global instance:
 
-```html
+```text
 <?!= webApp.include('partials/Header'); ?>
-<?!= webApp.js('components/UserTable'); ?> <?!=
-webApp.css('components/UserTable'); ?> <?!= webApp.html('partials/Footer'); ?>
+<?!= webApp.js('components/UserTable'); ?>
+<?!= webApp.css('components/UserTable'); ?>
+<?!= webApp.html('partials/Footer'); ?>
 ```
 
-Each resolves against the configured `static` dirs/extensions — e.g. `webApp.js('components/UserTable')` resolves to `dist/web/public/js/components/UserTable.js.html` by default.
+Each resolves against the configured `static` dirs/extensions — e.g. `webApp.js('components/UserTable')` resolves to `dist/web/public/js/components/UserTable.js.html` by default. A leading `/` is optional.
 
 ## Project Details
 
 ### Request Lifecycle
 
-1. `doGet`/`doPost` normalizes the raw event into a `RouteRequest` (route, method, params, body, a generated `reqId`, and whether it's a real HTTP request or a `google.script.run` call).
+1. `doGet`/`doPost` normalizes the raw event into a `RouteRequest` (route, method, params, body, a generated `reqId`, and whether it's a real HTTP request or a `google.script.run` call). A POST body is parsed by its `postData.type`: `application/json` (parameters such as `; charset=utf-8` allowed) is parsed, and a malformed body is a 400; `application/x-www-form-urlencoded` and `multipart/form-data` leave `request.body` undefined, as their fields are in `request.params`; any other type is passed through as the raw string.
 2. The request is dispatched through the matched route's middleware chain, then its handler.
 3. The result is serialized: real HTTP requests get a `ContentService`/`HtmlService` output; `google.script.run` calls get the plain payload.
 
 ### Error Handling
 
-Handlers and middleware can throw any `GasError` subclass (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`, from the `gas-error` peer package). `GasWebApp` catches these via `GasError.handle` and serializes them consistently instead of letting them crash the request — for both transports.
+Handlers and middleware can throw any `GasError` subclass (`GasNotFoundError`, `GasForbiddenError`, `GasValidationError`, `GasUnauthorizedError`, `GasRateLimitError`, from the `gas-error` peer package). `GasWebApp` catches these via `GasError.handle` and serializes them consistently instead of letting them crash the request — for both transports. Every failure takes this one path and is logged once, including a malformed request body and an `HtmlResponse` returned over `google.script.run`. Real HTTP requests receive the error envelope as JSON text output; `google.script.run` calls receive an `Error` whose message is that JSON.
+
+`createAuthMiddleware` rejects with a `GasUnauthorizedError` (401) in two cases, with fixed messages that never echo the email: `Unable to identify the signed-in user` when `Session` throws or returns an empty email (scope declined, or a consumer account under **Execute as: Me**), and `Not authorized` when `isAuthorized` returns false.
 
 ### Middleware Execution Order
 

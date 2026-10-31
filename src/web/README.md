@@ -28,16 +28,16 @@ src/lib/gas-webapp/
 src/web/public/js/lib/gas-webapp/
 ```
 
-Unlike the backend package, this one ships as TypeScript source rather than compiled output — it's meant to compile alongside the rest of your frontend under your own `tsconfig`, so your build catches a contract mismatch at typecheck time rather than at runtime.
+Like the backend package, this one ships compiled: `.js` files plus matching `.d.ts` declarations on the `dist-web` branch. The browser cannot load them directly from Apps Script, so your build wraps each `.js` file into a `.js.html` partial (a `<script>` block) that `webApp.js(...)` includes; the `.d.ts` files give your own TypeScript the typed `window.GasWebApp` contract.
 
 ## Load Order
 
 Load these three files, in this order, before anything that calls `configure()` or uses `GasWebApp.api`:
 
-```html
+```text
 <?!= webApp.js('/lib/gas-webapp/gas-webapp.config'); ?>
-<?!= webApp.js('/lib/gas-webapp/gas-webapp.errors'); ?> <?!=
-webApp.js('/lib/gas-webapp/gas-webapp.client'); ?>
+<?!= webApp.js('/lib/gas-webapp/gas-webapp.errors'); ?>
+<?!= webApp.js('/lib/gas-webapp/gas-webapp.client'); ?>
 ```
 
 Each file uses the `window.GasWebApp = window.GasWebApp || (...)` idiom and only reaches across the namespace inside function bodies — so nothing breaks if your own scripts load between these three. The ordering requirement is strictly about anything that _calls into_ the namespace (`configure()`, `api.get`, `api.post`) needing to load after all three.
@@ -68,7 +68,7 @@ Optional, and every field is. Without it, the client logs its own warnings and e
 | `ackRoute`          | `'/ack'`                    | Where the backend mounts `ack.handler`                 |
 | `ackPollIntervalMs` | `2000`                      | Gap between ack polls                                  |
 | `ackPollTimeoutMs`  | `5000`                      | Deadline for the ack poll itself                       |
-| `ackDeadlineMs`     | `8000`                      | Unacknowledged past this, a call counts as undelivered |
+| `ackDeadlineMs`     | `15000`                     | Unacknowledged past this, a call counts as undelivered |
 | `ackScope`          | `'Ack Watcher'`             | Logger scope for ack diagnostics                       |
 
 Call it once at boot. Values are read live on each request, so it only has to run before the first call.
@@ -98,13 +98,13 @@ try {
 
 ### Options
 
-| Option      | Default                    | Notes                                                                   |
-| ----------- | -------------------------- | ----------------------------------------------------------------------- |
-| `params`    | `{}`                       | Merged into the request alongside `route`. Values must be strings.      |
-| `body`      | —                          | POST only, JSON-serialized.                                             |
-| `timeoutMs` | `30000`                    | Client-side deadline. The server call keeps running past it regardless. |
-| `retries`   | `2` for GET, `0` for POST  | Attempts after the first, on `429`/`5xx` responses.                     |
-| `scope`     | `` `${method} ${route}` `` | Logger scope for failures.                                              |
+| Option      | Default                    | Notes                                                                                                                                |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `params`    | `{}`                       | Merged into the request alongside `route`. Values must be strings. `route` and `callId` are reserved and reject with `CLIENT_ERROR`. |
+| `body`      | —                          | POST only, JSON-serialized.                                                                                                          |
+| `timeoutMs` | `30000`                    | Client-side deadline. The server call keeps running past it regardless.                                                              |
+| `retries`   | `2` for GET, `0` for POST  | Attempts after the first, on `429`/`5xx` responses.                                                                                  |
+| `scope`     | `` `${method} ${route}` `` | Logger scope for failures.                                                                                                           |
 
 ## License
 
