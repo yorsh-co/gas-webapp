@@ -33,6 +33,12 @@ interface GasWebAppRequest {
   body: unknown;
   /** Unique id of this request. */
   id: string;
+  /**
+   * How the request arrived, inferred from the presence of `contextPath` on
+   * the event. Advisory: a `google.script.run` caller controls the whole
+   * event and can claim either value, so never use it for authentication,
+   * authorization or any other security decision.
+   */
   transport: GasWebAppTransport;
   /** The event Apps Script passed to `doGet`/`doPost`. */
   raw: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost;

@@ -3,7 +3,8 @@
  *
  * Every call goes through `google.script.run.doGet` / `doPost` with the
  * simulated event the router expects — `{ parameter: { route, callId, ...params },
- * postData?: { contents } }` — and resolves with the unwrapped `data` of the
+ * postData?: { contents } }`. PUT, PATCH and DELETE go through `doPost` with a
+ * `_method` parameter the router honours — and resolves with the unwrapped `data` of the
  * success envelope, or rejects with a `ServerError`.
  *
  * Three failure modes are handled separately:
@@ -28,7 +29,7 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
   'use strict';
 
   /** Event parameters the client sets itself; `options.params` may not use them. */
-  const RESERVED_PARAMS = ['route', 'callId'];
+  const RESERVED_PARAMS = ['route', 'callId', '_method', 'idempotencyKey'];
 
   /**
    * Read per call, never captured: `configure()` runs after this file loads,
@@ -80,7 +81,15 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
       event.parameter.callId = callId;
     }
 
-    if (method === 'POST' && options.body !== undefined) {
+    if (typeof options.idempotencyKey === 'string') {
+      event.parameter.idempotencyKey = options.idempotencyKey;
+    }
+
+    if (method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+      event.parameter._method = method;
+    }
+
+    if (method !== 'GET' && options.body !== undefined) {
       event.postData = {
         contents: JSON.stringify(options.body),
         type: 'application/json',
@@ -243,10 +252,10 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
       // failed upload.
       try {
         const event = buildEvent(method, route, options, callId);
-        if (method === 'POST') {
-          chained.doPost(event);
-        } else {
+        if (method === 'GET') {
           chained.doGet(event);
+        } else {
+          chained.doPost(event);
         }
       } catch (err) {
         settle(() => reject(window.GasWebApp.errors.clientError(err)));
@@ -288,11 +297,25 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     }
   }
 
+  /** Turns `idempotencyKey: true` into one UUID shared by every attempt. */
+  function resolveIdempotencyKey(
+    options: ApiRequestOptions,
+  ): ApiRequestOptions {
+    if (options.idempotencyKey !== true) return options;
+
+    try {
+      return { ...options, idempotencyKey: crypto.randomUUID() };
+    } catch (err) {
+      throw window.GasWebApp.errors.clientError(err);
+    }
+  }
+
   /**
-   * Attempt loop. GETs retry transient failures by default; POSTs do not,
-   * because a timed-out or 5xx POST may already have committed server-side.
-   * Pass `retries` explicitly to opt a POST route in — only for handlers that
-   * are idempotent or carry their own idempotency key.
+   * Attempt loop. GETs retry transient failures by default; POST, PUT, PATCH
+   * and DELETE do not, because a timed-out or 5xx write may already have
+   * committed server-side. A request with an `idempotencyKey` is safe to
+   * repeat and retries like a GET. The key is generated once and reused by
+   * every attempt. An explicit `retries` always wins.
    */
   async function request<T>(
     method: ApiMethod,
@@ -311,12 +334,16 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     }
 
     const scope = options.scope ?? `${method} ${route}`;
+    const resolved = resolveIdempotencyKey(options);
     const retries =
-      options.retries ?? (method === 'GET' ? config().getRetries : 0);
+      options.retries ??
+      (method === 'GET' || resolved.idempotencyKey !== undefined
+        ? config().getRetries
+        : 0);
 
     for (let attemptIndex = 0; ; attemptIndex += 1) {
       try {
-        return await attempt<T>(method, route, options);
+        return await attempt<T>(method, route, resolved);
       } catch (err) {
         const error =
           err instanceof window.GasWebApp.errors.ServerError
@@ -353,4 +380,21 @@ window.GasWebApp.api = window.GasWebApp.api || ({} as GasWebAppApi);
     body?: unknown,
     options: ApiRequestOptions = {},
   ): Promise<T> => request<T>('POST', route, { ...options, body });
+
+  api.put = <T>(
+    route: string,
+    body?: unknown,
+    options: ApiRequestOptions = {},
+  ): Promise<T> => request<T>('PUT', route, { ...options, body });
+
+  api.patch = <T>(
+    route: string,
+    body?: unknown,
+    options: ApiRequestOptions = {},
+  ): Promise<T> => request<T>('PATCH', route, { ...options, body });
+
+  api.delete = <T>(
+    route: string,
+    options: ApiRequestOptions = {},
+  ): Promise<T> => request<T>('DELETE', route, options);
 })(window.GasWebApp.api);

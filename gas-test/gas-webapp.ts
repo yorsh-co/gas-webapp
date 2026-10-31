@@ -267,6 +267,68 @@ test('a POST with _method=DELETE is dispatched as DELETE', () => {
   assert(result.data === '7', `unexpected payload: ${JSON.stringify(result)}`);
 });
 
+test('doGet resolves the route from pathInfo, and route wins when both are present', () => {
+  const app = new GasWebApp();
+  app.get('/users/:id', (req, res) => res.json(req.params.id));
+  app.get('/other', (_req, res) => res.json('other'));
+
+  const event = (
+    parameter: Record<string, string>,
+    pathInfo?: string,
+  ): GoogleAppsScript.Events.DoGet =>
+    ({ parameter, pathInfo }) as unknown as GoogleAppsScript.Events.DoGet;
+
+  const fromPath = app.doGet(event({}, 'users/42')) as SuccessPayload;
+  assert(fromPath.data === '42', `unexpected: ${JSON.stringify(fromPath)}`);
+
+  const both = app.doGet(
+    event({ route: '/other' }, 'users/42'),
+  ) as SuccessPayload;
+  assert(both.data === 'other', `route should win: ${JSON.stringify(both)}`);
+
+  const post = thrownEnvelope(() =>
+    app.doPost({
+      parameter: {},
+      pathInfo: 'users/42',
+    } as unknown as GoogleAppsScript.Events.DoPost),
+  );
+  assert(post.status === 404, 'doPost must not read pathInfo');
+});
+
+test('the idempotency guard runs once, replays, and clears on failure', () => {
+  const key = Utilities.getUuid();
+  const cacheKey = `idem:${key}`;
+  const cache = CacheService.getScriptCache();
+  const app = new GasWebApp();
+  let runs = 0;
+  let fail = true;
+  app.use(createIdempotencyGuard({ lockScope: 'script' }));
+  app.post('/charge', (_req, res) => {
+    runs += 1;
+    if (fail) throw new Error('boom');
+    res.status(201).json({ runs });
+  });
+
+  const call = (): SuccessPayload =>
+    app.doPost({
+      parameter: { route: '/charge', idempotencyKey: key },
+    } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+
+  assert(thrownEnvelope(call).status === 500, 'the first call should fail');
+  assert(cache.get(cacheKey) === null, 'a failure should clear the marker');
+
+  fail = false;
+  const first = call();
+  const second = call();
+  assert(runs === 2, `the handler should run once more, ran ${runs}`);
+  assert(first.status === 201 && first.data !== undefined, 'first call');
+  assert(
+    JSON.stringify(second) === JSON.stringify(first),
+    `replay should match: ${JSON.stringify(second)}`,
+  );
+  cache.remove(cacheKey);
+});
+
 test('the ack middleware records a call that its route then reports once', () => {
   const callId = Utilities.getUuid();
   const ack = createAckTracker({ ttlSeconds: 30 });

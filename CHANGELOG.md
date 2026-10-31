@@ -58,6 +58,11 @@
 - `GasWebApp` `errorView` option, rendering errors on HTTP `GET` requests as an HTML page and falling back to the JSON envelope
 - Unit tests for every built-in middleware, and Apps Script tests for the `CacheService`-backed ack and rate limiter, lock contention in both limiters, and `Session` email availability
 
+- Route resolution: `doGet` falls back to `e.pathInfo` when `route` is absent (`route` wins when both are present), so `/exec/users/42` reaches `/users/42`; `doPost` never reads `e.pathInfo`
+- Browser client `api.put`, `api.patch` and `api.delete`, sent through `doPost` with `_method`; `_method` and `idempotencyKey` join `route` and `callId` as reserved params. They do not retry by default, like `post`
+- `idempotencyKey` request option on the browser client (`true` generates one UUID per logical request, reused by every retry) and `createIdempotencyGuard` on the backend, which runs a keyed request once, replays its stored success envelope, answers 409 while it is in flight and clears the key on failure. A keyed request retries like a GET by default
+- Unit and Apps Script tests for route resolution, the client's new methods and the idempotency guard
+
 ### Changed
 
 - Prettier, TypeScript and ESLint configuration now come from [`gas-dev-config`](https://github.com/yorsh-co/gas-dev-config); the backend compiles to ES2020, as Apps Script rejects newer syntax on push
@@ -77,6 +82,7 @@
 
 ### Fixed
 
+- Documented that `req.transport` is advisory (a `google.script.run` caller controls the whole event, including `contextPath`) and must not drive security decisions (X8), and that `NOT_DELIVERED` can be a false negative when a call is queued past `ackDeadlineMs` and then runs (C4)
 - Prefix middleware at root and root-mounted routers match every path (R1, R2); sub-routers are live rather than copied at mount time (R3); unmatched requests pass through middleware before the 404 (R5)
 - The session id passed to the error handler is the authenticated user's email, as the request is mutated in place (L4)
 - Request normalisation runs inside the error boundary, so a malformed JSON body returns the 400 envelope to HTTP and RPC callers instead of an Apps Script error page

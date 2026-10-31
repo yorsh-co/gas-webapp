@@ -158,7 +158,12 @@ class GasWebApp extends GasWebAppRouter {
     );
   }
 
-  /** A real web app request carries `contextPath`; `google.script.run` calls do not. */
+  /**
+   * A real web app request carries `contextPath`; `google.script.run` calls
+   * do not. A `google.script.run` caller controls the whole event, so this is
+   * advisory: it selects the output format and refuses `render`/`redirect`
+   * over RPC, and must never drive a security decision.
+   */
   private _isHttpRequest(
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
   ): boolean {
@@ -212,7 +217,9 @@ class GasWebApp extends GasWebAppRouter {
   ): GasWebAppRequest {
     const parameter = (e && e.parameter) || {};
     const { route, _method, ...query } = parameter;
-    const path = gasWebAppNormalizePath(route || '/');
+    const path = gasWebAppNormalizePath(
+      this._resolveRoute(route, e, entryMethod),
+    );
 
     return {
       method: this._resolveMethod(entryMethod, _method),
@@ -229,6 +236,20 @@ class GasWebApp extends GasWebAppRouter {
       transport: this._isHttpRequest(e) ? 'http' : 'rpc',
       raw: e,
     };
+  }
+
+  /**
+   * The route source: the `route` parameter, then, on GET only, `e.pathInfo`
+   * (which Apps Script populates unreliably on POST), then the root.
+   */
+  private _resolveRoute(
+    route: string | undefined,
+    e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
+    entryMethod: 'GET' | 'POST',
+  ): string {
+    if (route) return route;
+    if (entryMethod === 'GET') return e?.pathInfo || '/';
+    return '/';
   }
 
   /**

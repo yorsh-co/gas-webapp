@@ -188,6 +188,28 @@ Deviations from Express, all forced by the platform or the wire contract: the su
 | Ad hoc probes  | `clasp run` and `clasp logs` on the test project         | Manual                     | One-off platform questions before a design depends on them                                                               |
 | Web app (HTTP) | A test deployment of the test project, called over HTTPS | Manual, Phase 6            | `e.pathInfo`, `contextPath`, POST bodies and response MIME types, which `clasp run` cannot exercise                      |
 
+#### Manual web app checks
+
+Run once on a test web app deployment of the `gas-test` project (Deploy, New deployment, Web app, execute as you, access: only you or anyone for a throwaway). Let `URL` be the `/exec` URL and `TOKEN=$(gcloud auth print-identity-token)` or, for a private deployment, `-H "Authorization: Bearer $(gcloud auth print-access-token)"`. Use `curl -L` throughout, as Apps Script redirects. The test app needs routes `GET /users/:id`, `POST /echo` and `DELETE /items/:id` returning `req.originalPath`, `req.method`, `req.body`, `req.query` and `req.transport`.
+
+| Check               | Command                                                                               | Expected                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| GET with pathInfo   | `curl -L "$URL/users/42"`                                                             | JSON envelope, `path: /users/42`, `transport: http`                     |
+| GET with route      | `curl -L "$URL?route=/users/42"`                                                      | Same result                                                             |
+| GET with both       | `curl -L "$URL/users/1?route=/users/42"`                                              | `route` wins: `/users/42`                                               |
+| POST with pathInfo  | `curl -L -X POST "$URL/echo" -d x=1`                                                  | 404 `Cannot POST /`: pathInfo is not read on `doPost`                   |
+| POST with route     | `curl -L -X POST "$URL?route=/echo" -d x=1`                                           | Routed to `/echo`; record whether `e.pathInfo` was set on the POST      |
+| POST form body      | `curl -L -X POST "$URL?route=/echo" -d a=1 -d b=2`                                    | `body` undefined, `query` `{a: "1", b: "2"}`                            |
+| POST JSON body      | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: application/json' -d '{"a":1}'` | `body` `{a: 1}`                                                         |
+| POST text body      | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: text/plain' -d hello`           | `body` `"hello"`                                                        |
+| POST malformed JSON | `curl -L -X POST "$URL?route=/echo" -H 'Content-Type: application/json' -d '{oops'`   | 400 error envelope, served as JSON                                      |
+| `_method` override  | `curl -L -X POST "$URL?route=/items/7&_method=DELETE"`                                | `method: DELETE`                                                        |
+| Bad `_method`       | `curl -L -X POST "$URL?route=/items/7&_method=TRACE"`                                 | 400 `Invalid _method`                                                   |
+| `_method` on GET    | `curl -L "$URL?route=/users/42&_method=DELETE"`                                       | Ignored: `method: GET`                                                  |
+| contextPath, MIME   | any of the above, `curl -L -i`                                                        | `transport: http`; the envelope is JSON text; record the `Content-Type` |
+
+Record the observed `e.pathInfo` and `e.contextPath` values and the MIME types in the README's platform notes.
+
 - The dedicated Apps Script test project is selected with `GAS_TEST_SCRIPT_ID`. Its ID stays out of the repository, and its contents are replaced on every run.
 - Apps Script tests start in Phase 2 and grow with each phase, instead of arriving at the end, so every backend phase is proven to push and run.
 
@@ -328,16 +350,16 @@ Branch: `feature/express-middleware`. Closes M3, X4, X7.
 
 Branch: `feature/transport`. Closes X2, X6 (client side), X8, C4.
 
-- [ ] Route resolution per decision 2, with a unit test for every row of the resolution table (X2).
-- [ ] Transport detection a `google.script.run` caller cannot spoof through `contextPath`; if no reliable signal exists, documented as advisory and never used for security decisions (X8).
-- [ ] Client: `api.put`, `api.patch` and `api.delete`, sending `_method` through `doPost` (X6).
-- [ ] Client: PUT, PATCH and DELETE do not retry by default, like POST.
-- [ ] Document that `NOT_DELIVERED` can be a false negative under queuing (C4).
-- [ ] Optional `idempotencyKey` request option, with a server helper that checks it against `CacheService` (C4).
+- [x] Route resolution per decision 2, with a unit test for every row of the resolution table (X2).
+- [x] Transport detection a `google.script.run` caller cannot spoof through `contextPath`; if no reliable signal exists, documented as advisory and never used for security decisions (X8). No unforgeable signal exists: documented as advisory, and nothing in `src/` makes a security decision from it.
+- [x] Client: `api.put`, `api.patch` and `api.delete`, sending `_method` through `doPost` (X6).
+- [x] Client: PUT, PATCH and DELETE do not retry by default, like POST.
+- [x] Document that `NOT_DELIVERED` can be a false negative under queuing (C4).
+- [x] Optional `idempotencyKey` request option, with a server helper that checks it against `CacheService` (C4).
 - [ ] Manual check on a test web app deployment: `e.pathInfo` on GET and POST, `contextPath`, form and JSON POST bodies, response MIME types. Record the results in the README's platform notes.
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated.
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 7: release and distribution
