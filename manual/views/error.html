@@ -1,0 +1,13 @@
+<? if (error.status === 418) { throw new Error('error view failure'); } ?>
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <title>Error <?= error.status ?></title>
+  </head>
+  <body>
+    <h1 id="error-status"><?= error.status ?> <?= error.code ?></h1>
+    <p id="error-message"><?= error.error ?></p>
+  </body>
+</html>

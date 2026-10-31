@@ -1,0 +1,44 @@
+<h1 id="title"><?= title ?></h1>
+<?!= webApp.js('gas-webapp.config'); ?>
+<?!= webApp.js('gas-webapp.errors'); ?>
+<?!= webApp.js('gas-webapp.client'); ?>
+<p>
+  <button id="get">api.get /users/1</button>
+  <button id="delete">api.delete /items/7</button>
+  <button id="post">api.post /echo</button>
+  <button id="missing">api.get /nope (expect 404)</button>
+  <button id="slow">api.get /slow (5 s, ack deadline 3 s)</button>
+</p>
+<pre id="out"></pre>
+<script>
+  const out = document.getElementById('out');
+  const show = (label, value) => {
+    out.textContent += label + ': ' + JSON.stringify(value, null, 2) + '\n';
+  };
+
+  window.GasWebApp.configure({
+    ackPollIntervalMs: 500,
+    ackDeadlineMs: 3000,
+    logger: {
+      debug: (scope, message, context) => show('debug ' + scope, [message, context]),
+      info: (scope, message, context) => show('info ' + scope, [message, context]),
+      warn: (scope, message, context) => show('warn ' + scope, [message, context]),
+      error: (scope, message, context) => show('error ' + scope, [message, context]),
+    },
+  });
+
+  const api = window.GasWebApp.api;
+  const run = (id, label, call) =>
+    document.getElementById(id).addEventListener('click', () =>
+      call().then(
+        (value) => show(label, value),
+        (err) => show(label + ' rejected', { status: err.status, code: err.code }),
+      ),
+    );
+
+  run('get', 'get', () => api.get('/users/1'));
+  run('delete', 'delete', () => api.delete('/items/7'));
+  run('post', 'post', () => api.post('/echo', { a: 1 }));
+  run('missing', 'missing', () => api.get('/nope'));
+  run('slow', 'slow', () => api.get('/slow', { timeoutMs: 20000 }));
+</script>
