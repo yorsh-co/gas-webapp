@@ -23,6 +23,8 @@
 - `scripts/sync-gas-webapp.sh` — a standalone installer, distributed for consumers to download rather than reimplement, that installs or updates the backend, browser client, and `gas-error`/`gas-logger` peer dependencies together in one reviewable operation; each target is added if missing or pulled if already present, and `--backend-only` skips the browser client
 - Optional `lockService` on `createRateLimiter`/`createConcurrencyLimiter` configs, accepting any object exposing `getLock(scope)`. Pass [`gas-lock`](https://github.com/yorsh-co/gas-lock) to route limiter locks through the same registry as the rest of the app; omitted, both resolve `LockService` directly
 - Client tunables on `GasWebApp.configure()` — timeout, retry count/backoff, retryable statuses, and the ack route/poll/deadline settings, all previously fixed in the client source. `ackRoute` in particular now matches apps that mount `ack.handler` somewhere other than `/ack`
+- Vitest smoke tests for `doGet` and `doPost` over both transports, run against the released `gas-error`, `gas-logger` and `gas-lock` peers, with fakes for `HtmlService`, `ContentService`, `CacheService`, `LockService`, `Session` and `Utilities`
+- Apps Script tests (`npm run test:gas`): the bundled peers and `GasWebApp` load, and simulated RPC and HTTP requests return the success and error envelopes
 
 ### Changed
 
@@ -30,6 +32,8 @@
 - Releases are published by [`gas-dev-release`](https://github.com/yorsh-co/gas-dev-release) to the `dist` and `dist-web` branches
 - `async` functions and `await` are lint errors in the backend sources
 - `gasDevConfig` in `package.json` declares the load order and the `gas-error`, `gas-logger` and `gas-lock` peers
+- Migrated to the `gas-error` 1.2 API: `GasError.handle` replaces `errorHandler`, and the error classes are `GasNotFoundError`, `GasValidationError`, `GasForbiddenError`, `GasUnauthorizedError` and `GasRateLimitError`. Earlier `gas-error` releases are no longer supported
+- `src/internal/` now holds the canonical `peer/*.d.ts` files of `gas-error`, `gas-logger` and `gas-lock`
 - Added a Vitest suite that loads the library in a sandboxed global scope
 
 ### Removed

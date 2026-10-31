@@ -161,7 +161,7 @@ class GasWebApp extends GasWebAppRouter {
         try {
           body = JSON.parse(postData.contents);
         } catch {
-          throw new ValidationError('Invalid JSON body');
+          throw new GasValidationError('Invalid JSON body');
         }
       }
     }
@@ -192,7 +192,7 @@ class GasWebApp extends GasWebAppRouter {
 
       return this.json(result);
     } catch (err) {
-      return errorHandler(err as Error, {
+      return GasError.handle(err, {
         logger: this._logger,
         method: request.method,
         path: request.route || '',
@@ -207,7 +207,7 @@ class GasWebApp extends GasWebAppRouter {
   ): WebAppResponse {
     if (response instanceof HtmlResponse) {
       if (!isHttpRequest) {
-        throw new ForbiddenError(
+        throw new GasForbiddenError(
           'HtmlResponse cannot be returned over google.script.run',
         );
       }

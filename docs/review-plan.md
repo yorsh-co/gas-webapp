@@ -237,19 +237,19 @@ Pulled forward because `gas-dev-config check` requires the standard `release` an
 
 Branch: `feature/peer-upgrade`. Closes B1, B2; starts T3.
 
-- [ ] Replace `src/internal/gas-webapp.peer.types.ts` with the canonical `peer/*.d.ts` from gas-error 1.2.1, gas-logger 1.3.1 and gas-lock 1.2.1.
-- [ ] Migrate every `errorHandler` call to `GasError.handle`.
-- [ ] Migrate every error class to its `Gas*` name.
+- [x] Replace `src/internal/gas-webapp.peer.types.ts` with the canonical `peer/*.d.ts` from gas-error 1.2.1, gas-logger 1.3.1 and gas-lock 1.2.1.
+- [x] Migrate every `errorHandler` call to `GasError.handle`.
+- [x] Migrate every error class to its `Gas*` name.
 - [x] Add `tsconfig.test.json`, Vitest and the `test`/`test:watch` scripts.
 - [x] Add `test/harness.ts` using `createGasLoader` with `loadOrderFiles`.
-- [ ] Add `test/mocks.ts` for `HtmlService`, `ContentService`, `CacheService`, `LockService`, `Session` and `Utilities`, in the sibling libraries' style.
-- [ ] Unit smoke tests: both entry points, both transports, one success and one error each. No router characterisation tests: Phase 4 replaces that behaviour.
-- [ ] Add `gas-test/tsconfig.json` and `gasDevConfig.gasTest.scopes` for the services under test (at least `userinfo.email`).
-- [ ] Add the `test:gas:build` and `test:gas` scripts.
-- [ ] First Apps Script test: the bundled peers and gas-webapp load, and a simulated RPC request returns the success envelope.
-- [ ] `npm run test:gas` passes on the test project.
-- [ ] `npm run check` passes.
-- [ ] CHANGELOG `[Unreleased]` updated.
+- [x] Add `test/mocks.ts` for `HtmlService`, `ContentService`, `CacheService`, `LockService`, `Session` and `Utilities`, in the sibling libraries' style.
+- [x] Unit smoke tests: both entry points, both transports, one success and one error each. No router characterisation tests: Phase 4 replaces that behaviour.
+- [x] Add `gas-test/tsconfig.json` and `gasDevConfig.gasTest.scopes` for the services under test (at least `userinfo.email`).
+- [x] Add the `test:gas:build` and `test:gas` scripts.
+- [x] First Apps Script test: the bundled peers and gas-webapp load, and a simulated RPC request returns the success envelope.
+- [x] `npm run test:gas` passes on the test project.
+- [x] `npm run check` passes.
+- [x] CHANGELOG `[Unreleased]` updated.
 - [ ] Reviewed, committed, merged into `develop`.
 
 ### Phase 3: fixes that survive the rewrite

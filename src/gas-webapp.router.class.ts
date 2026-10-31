@@ -93,7 +93,7 @@ class GasWebAppRouter {
     const entry = this._routes.get(`${request.method} ${normalizedRoute}`);
 
     if (!entry) {
-      throw new NotFoundError(
+      throw new GasNotFoundError(
         `No route registered for ${request.method} ${normalizedRoute}`,
       );
     }

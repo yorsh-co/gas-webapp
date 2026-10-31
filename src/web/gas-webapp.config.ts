@@ -4,7 +4,7 @@
  *
  * Load this before `gas-webapp.errors` and `gas-webapp.client`. A consuming app
  * calls `configure()` once at boot; until then the client logs to `console` at
- * warn and above, mirroring `errorHandler`'s `logger = console` default on the
+ * warn and above, mirroring `GasError.handle`'s `logger = console` default on the
  * server, and runs on the defaults below.
  */
 window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
