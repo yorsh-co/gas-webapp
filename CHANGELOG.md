@@ -2,6 +2,15 @@
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- `gas-dev-config` dev dependency bumped to `^1.8.0`
+- `.prettierignore` now lists `.claude/worktrees` and `.claude/plans`, which `gas-dev-config check` requires
+
+---
+
 ## [1.0.0] - 2026-10-31
 
 First tagged release, planned as 1.0.0. The API changed throughout against the untagged 0.x code; see the [migration guide](https://github.com/yorsh-co/gas-webapp/blob/main/docs/migration-1.0.md).
