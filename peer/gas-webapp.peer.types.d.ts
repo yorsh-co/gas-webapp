@@ -21,7 +21,7 @@
  * Usage: copy into the consuming package as `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-webapp
- * @version 1.0.2
+ * @version 1.0.3
  */
 
 // =========================
