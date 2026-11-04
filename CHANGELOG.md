@@ -7,7 +7,9 @@
 ### Changed
 
 - Peer type declarations are synced with `gas-dev-config peers sync`; `peers:check` script added
-- Requires `gas-dev-config` `^1.10.0`
+- Requires `gas-dev-config` `^2.0.0`
+- Requires `gas-dev-release` `^2.0.0`
+- Requires `gas-dev-bundle` `^2.0.0`
 
 ### Fixed
 
