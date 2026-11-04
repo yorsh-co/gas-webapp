@@ -1,5 +1,7 @@
 node_modules
 .worktrees
 .manual-webapp
+.claude/worktrees
+.claude/plans
 # Apps Script scriptlets (<? ?>) are not valid HTML for Prettier to reflow
 manual/views
