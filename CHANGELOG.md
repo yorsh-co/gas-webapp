@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+---
+
+## [1.0.4] - 2026-11-04
+
 ### Changed
 
 - Peer type declarations are synced with `gas-dev-config peers sync`; `peers:check` script added
