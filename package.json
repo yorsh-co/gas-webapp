@@ -1,6 +1,6 @@
 {
   "name": "gas-webapp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Express-style router and middleware for Google Apps Script web apps.",
   "repository": {
