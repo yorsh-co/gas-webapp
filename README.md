@@ -111,7 +111,7 @@ It is recommended to use `gas-webapp` together with [Google's `clasp` CLI](https
 [gas-dev-bundle](https://github.com/yorsh-co/gas-dev-bundle) resolves version ranges against the libraries' release tags and writes them into one script, in dependency order.
 
 ```bash
-npm install -D github:yorsh-co/gas-dev-bundle#semver:^1.1.1
+npm install -D github:yorsh-co/gas-dev-bundle#semver:^2.0.0
 ```
 
 List the libraries in your `package.json`:
