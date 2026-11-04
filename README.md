@@ -122,9 +122,9 @@ List the libraries in your `package.json`:
     "outFile": "src/lib/gas-libraries.js",
     "libraries": {
       "gas-webapp": "^1.0.0",
-      "gas-error": "^1.2.0",
-      "gas-logger": "^1.3.0",
-      "gas-lock": "^1.2.0"
+      "gas-error": "^1.2.2",
+      "gas-logger": "^2.0.1",
+      "gas-lock": "^1.2.1"
     }
   }
 }
