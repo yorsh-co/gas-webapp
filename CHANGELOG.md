@@ -2,6 +2,20 @@
 
 ---
 
+## [1.0.3] - 2026-11-04
+
+### Changed
+
+- Requires `gas-dev-release` `^1.3.0`, whose release preflight checks that the peer declarations' `@version` header matches `package.json`
+- Requires `gas-dev-config` `^1.9.0`
+- `.prettierignore` lists `.claude/handoff`, as required by `gas-dev-config check`
+
+### Fixed
+
+- The peer declarations' `@version` header now matches the package version (1.0.2); the vendored gas-lock, gas-error and gas-logger peer declarations are re-copied from gas-lock 1.2.2, gas-error 1.2.3 and gas-logger 2.0.2
+
+---
+
 ## [1.0.2] - 2026-11-04
 
 ### Changed
