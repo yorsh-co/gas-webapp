@@ -16,7 +16,7 @@
  * Usage: copy into the consuming package as `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-logger
- * @version 1.2.0
+ * @version 2.0.1
  */
 
 type GasLoggerLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -24,12 +24,17 @@ type GasLoggerLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 type GasLoggerMeta = Record<string, unknown>;
 
 interface GasLoggerSheetConfig {
-  spreadsheet?: GoogleAppsScript.Spreadsheet.Spreadsheet;
-  spreadsheetUrl?: string;
-  spreadsheetId?: string;
-  /** Default when no spreadsheet configuration is provided */
-  useActiveSpreadsheet?: boolean;
-  /** Name of the target sheet */
+  /**
+   * The spreadsheet to log to: a Spreadsheet, or a function returning one.
+   * A function is called on the first write, not at construction, so it can
+   * run where no spreadsheet is available yet (global scope, web app
+   * entry points). It is called once per execution; if it returns no
+   * spreadsheet or throws, sheet logging is disabled for the execution.
+   */
+  spreadsheet:
+    | GoogleAppsScript.Spreadsheet.Spreadsheet
+    | (() => GoogleAppsScript.Spreadsheet.Spreadsheet | null);
+  /** Name of the target sheet. @default 'gas-log' */
   sheetName?: string;
 }
 
