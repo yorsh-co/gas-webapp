@@ -16,7 +16,6 @@
  * Usage: copy into the consuming package as `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-error
- * @version 1.2.3
  */
 
 /**
