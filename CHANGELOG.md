@@ -2,6 +2,15 @@
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- `gas-logger` peer range widened to `^1.3.0 || ^2.0.0`; vendored gas-logger declarations updated to 2.0.1
+- README install example lists the latest `gas-error` (`^1.2.2`), `gas-logger` (`^2.0.1`) and `gas-lock` (`^1.2.1`)
+
+---
+
 ## [1.0.0] - 2026-10-31
 
 First tagged release, planned as 1.0.0. The API changed throughout against the untagged 0.x code; see the [migration guide](https://github.com/yorsh-co/gas-webapp/blob/main/docs/migration-1.0.md).
