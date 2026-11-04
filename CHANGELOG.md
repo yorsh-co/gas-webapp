@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- README installs `gas-dev-bundle` `^2.0.0` (was `^1.1.1`)
+
 ---
 
 ## [1.0.4] - 2026-11-04
