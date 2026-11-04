@@ -14,7 +14,7 @@
     "homepage": "https://yorsh.co"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   },
   "type": "module",
   "prettier": "gas-dev-config/prettier",
