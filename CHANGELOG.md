@@ -7,6 +7,8 @@
 ### Changed
 
 - Requires `gas-dev-release` `^1.3.0`, whose release preflight checks that the peer declarations' `@version` header matches `package.json`
+- Requires `gas-dev-config` `^1.9.0`
+- `.prettierignore` lists `.claude/handoff`, as required by `gas-dev-config check`
 
 ### Fixed
 
