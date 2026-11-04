@@ -8,6 +8,8 @@
 
 - `gas-dev-config` dev dependency bumped to `^1.8.0`
 - `.prettierignore` now lists `.claude/worktrees` and `.claude/plans`, which `gas-dev-config check` requires
+- `gas-logger` peer range widened to `^1.3.0 || ^2.0.0`; vendored gas-logger declarations updated to 2.0.1
+- README install example lists the latest `gas-error` (`^1.2.2`), `gas-logger` (`^2.0.1`) and `gas-lock` (`^1.2.1`)
 
 ---
 
