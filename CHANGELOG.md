@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- `createClientErrorHandler` middleware that receives, sanitizes and logs browser error reports
+- Optional `gas-webapp.reporter` web file and `GasWebApp.reporter.install()` to forward `logger.error` calls and uncaught errors to that route; `reporter` is now a reserved `GasWebApp` namespace key
+- ADR 0001 recording the client error reporting design
+
 ---
 
 ## [1.0.5] - 2026-11-12
