@@ -590,6 +590,16 @@ describe('createClientErrorHandler', () => {
     );
   });
 
+  it('strips Unicode line separators and bidi overrides from scope', () => {
+    const { logger, call } = run({
+      ...valid,
+      scope: 'A\u2028B\u202eC\u0085D',
+    });
+    call();
+
+    expect(logger.error.mock.calls[0]?.[0]).toBe('Client error: A B C D');
+  });
+
   it('falls back to the default scope when scope is blank after sanitizing', () => {
     const { logger, call } = run({ ...valid, scope: '\r\n' });
     call();
@@ -666,6 +676,24 @@ describe('createClientErrorHandler', () => {
     expect(call).not.toThrow();
     expect(logger.error).toHaveBeenCalledOnce();
     expect(json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('ignores invalid limit values and keeps the defaults', () => {
+    const { logger, call } = run(
+      { ...valid, message: 'abcdefgh' },
+      {
+        limits: {
+          message: -1,
+          stack: Number.NaN,
+          scope: Number.POSITIVE_INFINITY,
+          url: '5' as unknown as number,
+          context: undefined as unknown as number,
+        },
+      },
+    );
+    call();
+
+    expect(logged(logger).message).toBe('abcdefgh');
   });
 
   it('honors custom limits', () => {

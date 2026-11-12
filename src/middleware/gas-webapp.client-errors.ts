@@ -13,8 +13,9 @@ const GAS_WEBAPP_CLIENT_ERROR_LIMITS: Required<GasWebAppClientErrorLimits> = {
 };
 const GAS_WEBAPP_CLIENT_ERROR_TIMESTAMP_MAX = 100;
 const GAS_WEBAPP_CLIENT_ERROR_DEFAULT_SCOPE = 'Client';
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
+const CONTROL_CHARS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 const GAS_WEBAPP_CLIENT_ERROR_CONTEXT_OMITTED = '[context omitted]';
 
 /**
@@ -49,7 +50,15 @@ const createClientErrorHandler = (
   logger: GasLogger | typeof console = console,
   config: GasWebAppClientErrorConfig = {},
 ): GasWebAppHandler => {
-  const limits = { ...GAS_WEBAPP_CLIENT_ERROR_LIMITS, ...config.limits };
+  const limits = { ...GAS_WEBAPP_CLIENT_ERROR_LIMITS };
+  for (const key of Object.keys(
+    limits,
+  ) as (keyof GasWebAppClientErrorLimits)[]) {
+    const value: unknown = config.limits?.[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      limits[key] = value;
+    }
+  }
 
   const text = (value: unknown, max: number): string | undefined =>
     typeof value === 'string' ? value.slice(0, max) : undefined;
