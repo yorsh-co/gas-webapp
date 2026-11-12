@@ -22,7 +22,7 @@ The worked example is magb.kpis, the last consumer of the 0.x API: its `app.ts`,
 | `request.body` always parsed as JSON                        | Parsed by content type; form fields are in `req.query`                                 |
 | `NotFoundError`, `ValidationError`, …                       | `GasNotFoundError`, `GasValidationError`, …                                            |
 | `errorHandler(err)`                                         | `GasError.handle(err)` (needs `gas-error` >= 1.2)                                      |
-| Subtree for the backend and each peer                       | [gas-dev-bundle](https://github.com/yorsh-co/gas-dev-bundle)                           |
+| Subtree for the backend and each peer                       | [gasdev bundle](https://github.com/yorsh-co/gasdev#bundle)                             |
 | `scripts/sync-gas-webapp.sh` installed both halves          | The script installs the browser client only                                            |
 
 Behaviour that changes without a type error:
@@ -278,7 +278,7 @@ webRouter.get('/', (req, res) =>
 
 ## Installation
 
-- Replace the subtrees of the backend and of `gas-error`, `gas-logger` and `gas-lock` with [gas-dev-bundle](https://github.com/yorsh-co/gas-dev-bundle): list the four libraries under `gasDevBundle.libraries`, run `npx gas-dev-bundle`, commit the generated file and point `filePushOrder` at it. `gas-error` must be listed explicitly, as gas-dev-bundle treats peers as optional. This also removes the vendored `gas-error.handler.js`: `gas-error` >= 1.2 replaces `errorHandler` with `GasError.handle`, and 1.0 requires it.
+- Replace the subtrees of the backend and of `gas-error`, `gas-logger` and `gas-lock` with [gasdev bundle](https://github.com/yorsh-co/gasdev#bundle): list the four libraries under `gasdev.bundle.libraries`, run `npx gasdev bundle`, commit the generated file and point `filePushOrder` at it. `gas-error` must be listed explicitly, as gasdev bundle treats peers as optional. This also removes the vendored `gas-error.handler.js`: `gas-error` >= 1.2 replaces `errorHandler` with `GasError.handle`, and 1.0 requires it.
 - Keep the browser client on `git subtree`. `scripts/sync-gas-webapp.sh` now installs the client only (`dist-web`).
 - The client's `api.get` and `api.post` calls are unchanged. `put`, `patch`, `delete` and `idempotencyKey` are new; see the [client README](https://github.com/yorsh-co/gas-webapp/tree/dist-web).
 - Declare any custom request fields by merging into `GasWebAppRequest`:

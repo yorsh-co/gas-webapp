@@ -16,7 +16,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bundle } from 'gas-dev-bundle';
+import { bundle } from 'gasdev/bundle';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, '.manual-webapp');
@@ -32,9 +32,7 @@ if (!scriptId) {
   process.exit(1);
 }
 
-const { gasDevConfig } = JSON.parse(
-  readFileSync(join(ROOT, 'package.json'), 'utf8'),
-);
+const { gasdev } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
 /** Writes `content` to `path` under the output folder, creating directories. */
 function emit(path, content) {
@@ -62,11 +60,11 @@ mkdirSync(OUT, { recursive: true });
 // Peers, bundled from their release tags as a consumer would.
 emit(
   'lib/gas-libraries.js',
-  bundle({ libraries: gasDevConfig.peers, cwd: ROOT }).code,
+  bundle({ libraries: gasdev.peers, cwd: ROOT }).code,
 );
 
 // The compiled library, one file each, in load order.
-const libraryFiles = gasDevConfig.loadOrder.map((file) => {
+const libraryFiles = gasdev.loadOrder.map((file) => {
   const compiled = file.replace(/\.ts$/, '.js');
   const target = `lib/gas-webapp/${compiled}`;
   emit(target, readFileSync(join(ROOT, 'dist', compiled), 'utf8'));

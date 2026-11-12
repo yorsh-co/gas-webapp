@@ -7,14 +7,14 @@
 # subtree'd itself. See the README's Quick Start for the fetch command.
 #
 # The backend and its peers (gas-error, gas-logger, gas-lock) are not handled
-# here: install them with gas-dev-bundle, which covers Apps Script code only.
+# here: install them with gasdev bundle, which covers Apps Script code only.
 # The browser client stays on `git subtree` and ships on its own branch,
 # `dist-web`, since `git subtree` imports a branch root and cannot select a
 # subdirectory.
 #
-# gas-dev-bundle treats `gasLibrary.peers` as optional, so it will not pull
+# gasdev bundle treats `gasLibrary.peers` as optional, so it will not pull
 # gas-error in on its own — list gas-error explicitly under
-# `gasDevBundle.libraries`, or the bundle fails only at runtime.
+# `gasdev.bundle.libraries`, or the bundle fails only at runtime.
 #
 # The target is added or updated based on whether its prefix already exists
 # — `git subtree add` fails outright if the directory is already there, and

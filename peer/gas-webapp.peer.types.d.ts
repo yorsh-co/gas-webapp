@@ -18,10 +18,11 @@
  * Peer dependencies (expected as globals, declared by their own peer files):
  *   - GasLogger (gas-logger), for `GasWebAppConfig.logger`
  *
- * Usage: copy into the consuming package as `src/internal/`.
+ * Usage: list `gas-webapp` in `gasdev.peers` and run
+ * `gasdev peers sync`, which writes it to `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-webapp
- * @version 1.0.4
+ * @version 1.0.5
  */
 
 // =========================

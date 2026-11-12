@@ -7,3 +7,9 @@ dist/
 
 # Manual web app fixture build
 .manual-webapp/
+
+# Local agent state and secrets
+.claude/worktrees/
+.claude/plans/
+.claude/handoff/
+.env

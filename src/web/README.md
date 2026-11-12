@@ -18,11 +18,11 @@ Ships from the same repository on a separate `dist-web` release branch, since `g
 
 ### Requirements
 
-This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together: the `gas-webapp` range in `gasDevBundle.libraries` and the `dist-web` ref you subtree.
+This package only makes sense paired with a `gas-webapp` backend deployment — it assumes the same request/response envelope and, for delivery acknowledgement, an `/ack` route registered via that package's `createAckTracker`. Pin both packages to versions released together: the `gas-webapp` range in `gasdev.bundle.libraries` and the `dist-web` ref you subtree.
 
 ## Install
 
-The backend and its peers are installed with gas-dev-bundle, see the [backend README's Quick Start](https://github.com/yorsh-co/gas-webapp#quick-start). gas-dev-bundle covers Apps Script code only, so the client is installed separately, with git subtree. Either download and run the sync script from your project root, which adds the client the first time and pulls updates after that:
+The backend and its peers are installed with gasdev bundle, see the [backend README's Quick Start](https://github.com/yorsh-co/gas-webapp#quick-start). gasdev bundle covers Apps Script code only, so the client is installed separately, with git subtree. Either download and run the sync script from your project root, which adds the client the first time and pulls updates after that:
 
 ```bash
 curl -o scripts/sync-gas-webapp.sh \

@@ -6,6 +6,16 @@
 
 ---
 
+## [1.0.5] - 2026-11-12
+
+### Changed
+
+- README installs `gasdev` `^3.0.0` (`gasdev bundle`)
+- Tooling now requires `gasdev` `^3.0.0`, replacing `gas-dev-config`, `gas-dev-bundle` and `gas-dev-release`
+- `engines.node` minimum is now `^22.15.0`
+
+---
+
 ## [1.0.4] - 2026-11-04
 
 ### Changed
