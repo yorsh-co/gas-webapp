@@ -18,7 +18,10 @@ export interface ClientNamespace {
     patch(route: string, body?: unknown, options?: object): Promise<unknown>;
     delete(route: string, options?: object): Promise<unknown>;
   };
-  errors: { ServerError: new (payload: object) => Error };
+  errors: {
+    ServerError: new (payload: object) => Error;
+    logServerError(err: Error, scope?: string): object;
+  };
   reporter?: { install(options: object): void };
 }
 

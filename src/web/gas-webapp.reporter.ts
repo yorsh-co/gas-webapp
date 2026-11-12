@@ -31,6 +31,7 @@ window.GasWebApp = window.GasWebApp || ({} as GasWebAppNamespace);
    */
   function isServerPayload(context: unknown): boolean {
     if (typeof context !== 'object' || context === null) return false;
+    if (window.GasWebApp.errors._isClientMinted(context)) return false;
     const payload = context as { ok?: unknown; code?: unknown };
     return (
       payload.ok === false &&

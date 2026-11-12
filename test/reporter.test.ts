@@ -82,6 +82,28 @@ describe('GasWebApp.reporter', () => {
     expect(events).toHaveLength(0);
   });
 
+  it('forwards an INTERNAL_ERROR minted from a non-JSON failure', () => {
+    const { client, events } = setup();
+
+    client.errors.logServerError(new Error('Service timed out'), 'S');
+
+    expect(events).toHaveLength(1);
+  });
+
+  it('does not forward a parsed server INTERNAL_ERROR payload', () => {
+    const { client, events } = setup();
+    const payload = {
+      ok: false,
+      error: 'x',
+      status: 500,
+      code: 'INTERNAL_ERROR',
+    };
+
+    client.errors.logServerError(new Error(JSON.stringify(payload)), 'S');
+
+    expect(events).toHaveLength(0);
+  });
+
   it.each(['CLIENT_TIMEOUT', 'NOT_DELIVERED', 'CLIENT_ERROR'])(
     'forwards a %s payload',
     (code) => {

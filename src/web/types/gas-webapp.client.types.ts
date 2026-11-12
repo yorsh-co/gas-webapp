@@ -130,6 +130,10 @@ interface GasWebAppErrors {
   timeoutError(route: string, timeoutMs: number): IServerError;
   notDeliveredError(route: string): IServerError;
   clientError(err: unknown): IServerError;
+  /** @internal */
+  _markClientMinted(payload: GasErrorPayload): GasErrorPayload;
+  /** @internal */
+  _isClientMinted(payload: unknown): boolean;
 }
 
 /** Options for `GasWebApp.reporter.install()`. */
