@@ -681,6 +681,51 @@ Query values are logged with the keys in `options.redact` masked as `[REDACTED]`
 app.use(createLoggingMiddleware(gasLogger, { redact: ['token', 'ssn'] }));
 ```
 
+### Client error reporting
+
+`createClientErrorHandler(logger?, config?)` is a route handler, not middleware. It receives error reports from the browser client's optional [reporter](src/web/README.md#error-reporting), validates them, and writes one `logger.error` line per report. `logger` is a `gas-logger` instance, or `console` (the default). Pair it with [`gas-chat`](https://github.com/yorsh-co/gas-chat) to turn each line into a Google Chat alert:
+
+```ts
+const chat = new GasChat({
+  appName: 'My App',
+  webhookUrl: () =>
+    PropertiesService.getScriptProperties().getProperty('CHAT_WEBHOOK'),
+});
+const log = chat.logger(
+  new GasLogger({
+    sheetConfig: { spreadsheet: () => SpreadsheetApp.openById(ID) },
+  }),
+);
+
+webApp.post(
+  '/client-errors',
+  createRateLimiter({
+    limit: 20,
+    windowSeconds: 60,
+    keyFn: (req) => `client-errors:${req.user?.email ?? 'anon'}`,
+  }),
+  createClientErrorHandler(log),
+);
+```
+
+The handler keeps no throttling state, so mount a rate limiter in front of it. Key it per user as above. A deployment that allows anonymous access has no `req.user`, so every visitor shares the `anon` bucket; Apps Script exposes no client IP, so use a coarser key and a higher limit there.
+
+The body must be a plain object with a non-empty string `message` and a `kind` of `logged`, `uncaught` or `unhandledrejection`; anything else is a `GasValidationError` (400). Unknown keys are dropped and every field is truncated. Override the caps with `createClientErrorHandler(log, { limits: { stack: 8000 } })`:
+
+| Limit       | Default | Applies to                                                                       |
+| ----------- | ------- | -------------------------------------------------------------------------------- |
+| `message`   | `1000`  | `message`                                                                        |
+| `stack`     | `4000`  | `stack`                                                                          |
+| `scope`     | `100`   | `scope`                                                                          |
+| `url`       | `500`   | `url`                                                                            |
+| `userAgent` | `300`   | `userAgent`                                                                      |
+| `context`   | `2000`  | JSON-serialized `context`; over the cap, or unserializable, a marker replaces it |
+
+A valid report is answered with `202 { received: true }` and logged as `logger.error('Client error: <scope>', { kind, message, stack, url, userAgent, clientTimestamp, context, user, reqId })`, where `user` is `req.user` and `reqId` is `req.id`. The handler then calls `logger.flush()` when the logger has one.
+
+> **Note:**
+> `gas-chat` suppresses identical alerts for `throttleSeconds` (300 by default), and posting to the webhook needs the `https://www.googleapis.com/auth/script.external_request` scope in `appsscript.json`. `gas-webapp` adds neither; both stay your choice.
+
 ## Express differences
 
 `gas-webapp` follows Express where Apps Script allows. These are the differences, all forced by the platform or the wire contract:
