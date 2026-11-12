@@ -61,9 +61,15 @@ Load these three files, in this order, before anything that calls `configure()` 
 
 Each file uses the `window.GasWebApp = window.GasWebApp || (...)` idiom and only reaches across the namespace inside function bodies — so nothing breaks if your own scripts load between these three. The ordering requirement is strictly about anything that _calls into_ the namespace (`configure()`, `api.get`, `api.post`) needing to load after all three.
 
+An optional fourth file, `gas-webapp.reporter`, enables [error reporting](#error-reporting). Load it after `gas-webapp.client`; without it, nothing changes:
+
+```text
+<?!= app.js('/lib/gas-webapp/gas-webapp.reporter'); ?>
+```
+
 ### Reserved namespace keys
 
-`window.GasWebApp.{api, errors, logger, config}` are owned by this package — don't assign to them from your own code. `configure()` is the one supported entry point for customizing behavior.
+`window.GasWebApp.{api, errors, logger, config, reporter}` are owned by this package — don't assign to them from your own code. `configure()` is the one supported entry point for customizing behavior.
 
 ## Configure
 
@@ -169,6 +175,29 @@ Each call carries a `callId`. The backend's `createAckTracker` records it as the
 > `NOT_DELIVERED` can be a false negative. A call queued behind Apps Script's per-user concurrent execution limit for longer than `ackDeadlineMs` is reported as never delivered, and then runs. A retry without an idempotency key would commit the write twice. Use a key on every write you retry.
 
 The ack route must be mounted on the backend, ahead of the limiters, at the path `ackRoute` names.
+
+## Error reporting
+
+Optional. With `gas-webapp.reporter` loaded, `reporter.install()` forwards the client's `logger.error` calls, and optionally uncaught errors, to a route backed by the server's `createClientErrorHandler` (see the [main README](../../README.md#client-error-reporting)).
+
+```js
+window.GasWebApp.configure({ logger: window.App.log });
+window.GasWebApp.reporter.install({
+  route: '/client-errors',
+  captureGlobal: true,
+});
+```
+
+Call `install` after `configure({ logger })`: it wraps the current logger, and a later `configure({ logger })` replaces the wrapper and turns forwarding off. A second `install` is a no-op that logs a warning.
+
+| Option          | Default | Purpose                                                                      |
+| --------------- | ------- | ---------------------------------------------------------------------------- |
+| `route`         | —       | Required. Where the backend mounts the handler                               |
+| `captureGlobal` | `false` | Also report `error` and `unhandledrejection` events from the app's own frame |
+| `maxReports`    | `10`    | Reports sent per page load                                                   |
+| `dedupeMs`      | `60000` | Window in which an identical `kind`, scope and message is sent once          |
+
+Every `logger.error` call is forwarded except one whose `context` is a server-originated error payload (`ok === false` with a `code` other than `CLIENT_TIMEOUT`, `NOT_DELIVERED` or `CLIENT_ERROR`): the server already logged it, and forwarding would alert twice. Errors under the `'Error Reporter'` scope are never forwarded, so a failing send cannot loop; it is logged at `debug` on the original logger and dropped. Reports are sent without retries or delivery acknowledgement.
 
 ## License
 
