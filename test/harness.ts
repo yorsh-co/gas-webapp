@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { bundle } from 'gas-dev-bundle';
-import { createGasLoader, loadOrderFiles } from 'gas-dev-config/test';
+import { bundle } from 'gasdev/bundle';
+import { createGasLoader, loadOrderFiles } from 'gasdev/test';
 import { createMocks, type MockOptions, type Mocks } from './mocks';
 
 /** Loose, test-side view of the globals the library defines. */
@@ -81,12 +81,12 @@ const PEER_EXPORTS = [
 ];
 
 /**
- * The peer libraries as released, resolved from `gasDevConfig.peers` against
+ * The peer libraries as released, resolved from `gasdev.peers` against
  * their `dist/vX.Y.Z` tags. The first run fetches them; later runs use the
  * `node_modules/.cache` copy.
  */
 const peerCode = bundle({
-  libraries: gasDevConfigPeers(),
+  libraries: gasdevPeers(),
   cwd: ROOT,
 }).code;
 
@@ -105,12 +105,12 @@ const load = createGasLoader<GasWebAppGlobals>({
   root: ROOT,
 });
 
-/** Reads `gasDevConfig.peers` from package.json. */
-function gasDevConfigPeers(): Record<string, string> {
+/** Reads `gasdev.peers` from package.json. */
+function gasdevPeers(): Record<string, string> {
   const pkg = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as {
-    gasDevConfig: { peers: Record<string, string> };
+    gasdev: { peers: Record<string, string> };
   };
-  return pkg.gasDevConfig.peers;
+  return pkg.gasdev.peers;
 }
 
 /**

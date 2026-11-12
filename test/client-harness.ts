@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
-import { createGasLoader } from 'gas-dev-config/test';
+import { createGasLoader } from 'gasdev/test';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 

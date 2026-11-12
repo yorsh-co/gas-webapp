@@ -1,4 +1,4 @@
-import { gasEslint } from 'gas-dev-config/eslint';
+import { gasEslint } from 'gasdev/eslint';
 
 export default gasEslint(
   {

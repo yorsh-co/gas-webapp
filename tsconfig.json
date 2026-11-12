@@ -1,5 +1,5 @@
 {
-  "extends": "gas-dev-config/tsconfig/gas.json",
+  "extends": "gasdev/tsconfig/gas.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"

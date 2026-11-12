@@ -71,7 +71,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost) {
 
 ### Peer Dependencies
 
-`gas-webapp` expects the following as globals at runtime — each is a separate gas-\* library, bundled alongside `gas-webapp` by gas-dev-bundle.
+`gas-webapp` expects the following as globals at runtime — each is a separate gas-\* library, bundled alongside `gas-webapp` by gasdev bundle.
 
 | Package                                                | Required | Used for                                                                                                           |
 | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -106,43 +106,45 @@ It is recommended to use `gas-webapp` together with [Google's `clasp` CLI](https
 
 #### 1. Add the library to your Apps Script project
 
-##### Backend: gas-dev-bundle
+##### Backend: gasdev bundle
 
-[gas-dev-bundle](https://github.com/yorsh-co/gas-dev-bundle) resolves version ranges against the libraries' release tags and writes them into one script, in dependency order.
+[gasdev bundle](https://github.com/yorsh-co/gasdev#bundle) resolves version ranges against the libraries' release tags and writes them into one script, in dependency order.
 
 ```bash
-npm install -D github:yorsh-co/gas-dev-bundle#semver:^2.0.0
+npm install -D github:yorsh-co/gasdev#semver:^3.0.0
 ```
 
 List the libraries in your `package.json`:
 
 ```json
 {
-  "gasDevBundle": {
-    "outFile": "src/lib/gas-libraries.js",
-    "libraries": {
-      "gas-webapp": "^1.0.0",
-      "gas-error": "^1.2.2",
-      "gas-logger": "^2.0.1",
-      "gas-lock": "^1.2.1"
+  "gasdev": {
+    "bundle": {
+      "outFile": "src/lib/gas-libraries.js",
+      "libraries": {
+        "gas-webapp": "^1.0.0",
+        "gas-error": "^1.2.2",
+        "gas-logger": "^2.0.1",
+        "gas-lock": "^1.2.1"
+      }
     }
   }
 }
 ```
 
 ```bash
-npx gas-dev-bundle
+npx gasdev bundle
 ```
 
 - Commit the generated file. Its header records each library's version and commit SHA.
 - Re-run the command after changing a range to upgrade.
-- List `gas-error` even though it is a peer: gas-dev-bundle treats peers as optional and never adds one on its own, so a bundle without it fails only at runtime (P7). `gas-logger` and `gas-lock` can be left out; see [Peer Dependencies](#peer-dependencies).
+- List `gas-error` even though it is a peer: gasdev bundle treats peers as optional and never adds one on its own, so a bundle without it fails only at runtime (P7). `gas-logger` and `gas-lock` can be left out; see [Peer Dependencies](#peer-dependencies).
 
-See the [gas-dev-bundle README](https://github.com/yorsh-co/gas-dev-bundle) for configuration details.
+See the [gasdev bundle documentation](https://github.com/yorsh-co/gasdev#bundle) for configuration details.
 
 ##### Backend, this library only: git subtree
 
-The backend also ships on its own `dist` branch. Without gas-dev-bundle, add it and each peer you use with git subtree:
+The backend also ships on its own `dist` branch. Without gasdev bundle, add it and each peer you use with git subtree:
 
 ```bash
 git subtree add \
@@ -156,7 +158,7 @@ You then own the [file push order](#5-configure-the-file-push-order) of the peer
 
 ##### Browser client: git subtree
 
-gas-dev-bundle covers Apps Script code only (P6). The browser client ships on its own `dist-web` branch; `scripts/sync-gas-webapp.sh` adds it, and later pulls updates. Download it once and run it from your project root:
+gasdev bundle covers Apps Script code only (P6). The browser client ships on its own `dist-web` branch; `scripts/sync-gas-webapp.sh` adds it, and later pulls updates. Download it once and run it from your project root:
 
 ```bash
 curl -o scripts/sync-gas-webapp.sh \
@@ -252,7 +254,7 @@ Apps Script executes files by the order in the Apps Script editor, from top to b
 ReferenceError: GasWebAppRouter is not defined
 ```
 
-With gas-dev-bundle the library and its peers are one file, so a single [`filePushOrder`](https://github.com/google/clasp#filepushorder-optional) entry in `.clasp.json` is enough:
+With gasdev bundle the library and its peers are one file, so a single [`filePushOrder`](https://github.com/google/clasp#filepushorder-optional) entry in `.clasp.json` is enough:
 
 ```json
 {
@@ -706,9 +708,9 @@ These are Apps Script constraints. They are documented, not fixed.
 | P3  | `e.parameter` keeps only the first value of a repeated key; `e.parameters` holds them all.                                                                                                                  |
 | P4  | An anonymous GET with a path after `/exec` is redirected to the Google sign-in page and never runs the script, so `?route=` is the form that works for every caller.                                        |
 | P5  | Delivery acknowledgement costs one `CacheService` write per request plus polling while calls are in flight.                                                                                                 |
-| P6  | gas-dev-bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                                          |
+| P6  | gasdev bundle covers Apps Script code only. The browser client stays on `git subtree`, and your build wraps it into `.js.html` for `HtmlService`.                                                           |
 | P7  | `gasLibrary.peers` are optional by definition, so a project bundled without gas-error fails only at runtime.                                                                                                |
-| P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gas-dev-config` forbids them in Apps Script sources.                           |
+| P8  | The push-time parser rejects `async` and `await`, so backend code has no async functions at all. The `gas` ESLint preset of `gasdev` forbids them in Apps Script sources.                                   |
 | P9  | `res.redirect` relies on navigating the top window from `HtmlService`'s sandboxed iframe, which every tested browser blocks without a click. The user follows the page's "Continue to &lt;host&gt;" link.   |
 | P10 | An entry-point alias such as `const doGet = app.doGet` works over HTTP but fails over `google.script.run`; declare `doGet`/`doPost` as functions (see [Export the entry points](#export-the-entry-points)). |
 
@@ -729,7 +731,7 @@ Observed on a deployed web app (`manual/` fixture):
 The source is TypeScript, compiled to ES2020 because Apps Script's push-time parser rejects newer syntax.
 
 ```bash
-npm run check        # format, lint, typecheck, unit tests, gas-dev-config check
+npm run check        # format, lint, typecheck, unit tests, gasdev check
 npm run test:gas     # Apps Script tests on a dedicated project (GAS_TEST_SCRIPT_ID)
 npm run manual:build # the fixture for the manual web app checks
 ```
