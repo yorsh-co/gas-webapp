@@ -13,7 +13,8 @@
  * `include: ["src/**\/*.ts"]` but emits nothing, so no counterpart reaches
  * dist/ or the published package.
  *
- * Usage: copy into the consuming package as `src/internal/`.
+ * Usage: list `gas-lock` in `gasdev.peers` and run
+ * `gasdev peers sync`, which writes it to `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-lock
  */
