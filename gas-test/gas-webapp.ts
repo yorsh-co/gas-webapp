@@ -444,3 +444,27 @@ info('Session email availability', () => {
     effective ? 'available' : 'empty'
   }`;
 });
+
+test('the client error handler logs a posted report once and answers 202', () => {
+  const lines: Array<{ message: string; meta: unknown }> = [];
+  const logger = {
+    ...console,
+    error: (message: string, meta: unknown): void => {
+      lines.push({ message, meta });
+    },
+  } as unknown as typeof console;
+  const app = new GasWebApp();
+  app.post('/client-errors', createClientErrorHandler(logger));
+
+  const result = app.doPost({
+    parameter: { route: '/client-errors' },
+    postData: {
+      type: 'application/json',
+      contents: JSON.stringify({ kind: 'logged', scope: 'Cart', message: 'x' }),
+    },
+  } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+
+  assert(result.status === 202, `unexpected: ${JSON.stringify(result)}`);
+  assert(lines.length === 1, `expected one log line, got ${lines.length}`);
+  assert(lines[0]?.message === 'Client error: Cart', lines[0]?.message ?? '');
+});

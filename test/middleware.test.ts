@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { loadGasWebApp } from './harness';
 
 type Factory = (
@@ -476,5 +476,207 @@ describe('createLoggingMiddleware', () => {
 
     expect(query.token).toBe('t');
     expect(JSON.stringify(logger.info.mock.calls)).not.toContain('"x"');
+  });
+});
+
+describe('createClientErrorHandler', () => {
+  type ClientErrorFactory = (
+    logger?: object,
+    config?: { limits?: Record<string, number> },
+  ) => (req: object, res: object, next?: () => void) => void;
+
+  const valid = {
+    kind: 'logged',
+    scope: 'Cart',
+    message: 'boom',
+  };
+
+  const run = (
+    body: unknown,
+    options: { logger?: object; limits?: Record<string, number> } = {},
+  ) => {
+    const { lib, peers } = loadGasWebApp();
+    const logger = options.logger ?? {
+      error: vi.fn(),
+      flush: vi.fn(),
+    };
+    const json = vi.fn();
+    const res = { status: vi.fn(() => res), json };
+    const handler = (lib.createClientErrorHandler as ClientErrorFactory)(
+      logger,
+      options.limits ? { limits: options.limits } : undefined,
+    );
+    const call = () =>
+      handler({ body, id: 'r1', user: { email: 'a@b.c' } }, res);
+    return {
+      logger: logger as { error: Mock; flush?: Mock },
+      res,
+      json,
+      call,
+      peers,
+    };
+  };
+
+  const logged = (logger: { error: Mock }) =>
+    logger.error.mock.calls[0]?.[1] as Record<string, unknown>;
+
+  it('logs a valid report once with user and reqId, then answers 202', () => {
+    const { logger, res, json, call } = run({
+      ...valid,
+      stack: 's',
+      url: 'u',
+      userAgent: 'ua',
+      timestamp: 't',
+      context: { a: 1 },
+    });
+    call();
+
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith('Client error: Cart', {
+      kind: 'logged',
+      message: 'boom',
+      stack: 's',
+      url: 'u',
+      userAgent: 'ua',
+      clientTimestamp: 't',
+      context: { a: 1 },
+      user: { email: 'a@b.c' },
+      reqId: 'r1',
+    });
+    expect(logger.flush).toHaveBeenCalledOnce();
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('drops unknown keys', () => {
+    const body = JSON.parse('{"__proto__":{"x":1},"extra":"x"}');
+    Object.assign(body, valid);
+    const { logger, call } = run(body);
+    call();
+
+    const meta = logged(logger);
+    expect(Object.keys(meta)).not.toContain('extra');
+    expect(Object.keys(meta)).not.toContain('__proto__');
+    expect(meta).not.toHaveProperty('x');
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('"x"');
+  });
+
+  it('ignores non-string stack, url, userAgent and timestamp', () => {
+    const { logger, call } = run({
+      ...valid,
+      stack: 1,
+      url: {},
+      userAgent: ['ua'],
+      timestamp: 12345,
+    });
+    call();
+
+    const meta = logged(logger);
+    expect(meta.stack).toBeUndefined();
+    expect(meta.url).toBeUndefined();
+    expect(meta.userAgent).toBeUndefined();
+    expect(meta.clientTimestamp).toBeUndefined();
+  });
+
+  it('strips control characters from scope', () => {
+    const { logger, call } = run({
+      ...valid,
+      scope: 'A\r\nERROR forged\u0000',
+    });
+    call();
+
+    expect(logger.error.mock.calls[0]?.[0]).toBe(
+      'Client error: A  ERROR forged',
+    );
+  });
+
+  it('falls back to the default scope when scope is blank after sanitizing', () => {
+    const { logger, call } = run({ ...valid, scope: '\r\n' });
+    call();
+
+    expect(logger.error.mock.calls[0]?.[0]).toBe('Client error: Client');
+  });
+
+  it('keeps a context at the cap and replaces one over it', () => {
+    // JSON.stringify('abc') is 5 characters including quotes.
+    const kept = run({ ...valid, context: 'abc' }, { limits: { context: 5 } });
+    kept.call();
+    expect(logged(kept.logger).context).toBe('abc');
+
+    const over = run({ ...valid, context: 'abcd' }, { limits: { context: 5 } });
+    over.call();
+    expect(logged(over.logger).context).toBe('[context omitted]');
+  });
+
+  it('truncates each field at its cap', () => {
+    const long = 'x'.repeat(10000);
+    const { logger, call } = run({
+      kind: 'logged',
+      scope: long,
+      message: long,
+      stack: long,
+      url: long,
+      userAgent: long,
+      timestamp: long,
+    });
+    call();
+
+    const meta = logged(logger);
+    expect(logger.error.mock.calls[0]?.[0]).toBe(
+      `Client error: ${'x'.repeat(100)}`,
+    );
+    expect((meta.message as string).length).toBe(1000);
+    expect((meta.stack as string).length).toBe(4000);
+    expect((meta.url as string).length).toBe(500);
+    expect((meta.userAgent as string).length).toBe(300);
+    expect((meta.clientTimestamp as string).length).toBe(100);
+  });
+
+  it('replaces an oversized or circular context', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    for (const context of ['y'.repeat(3000), circular]) {
+      const { logger, call } = run({ ...valid, context });
+      call();
+      expect(logged(logger).context).toBe('[context omitted]');
+    }
+  });
+
+  it.each([
+    ['a non-object body', 'text'],
+    ['a null body', null],
+    ['an array body', []],
+    ['a missing message', { kind: 'logged', scope: 's' }],
+    ['an empty message', { ...valid, message: '' }],
+    ['a whitespace-only message', { ...valid, message: ' \n\t ' }],
+    ['an invalid kind', { ...valid, kind: 'other' }],
+    ['a missing kind', { scope: 's', message: 'm' }],
+  ])('rejects %s with a 400', (_name, body) => {
+    const { logger, call, peers } = run(body);
+
+    expect(call).toThrow(peers.GasValidationError as ErrorConstructor);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('works with a console-like logger that has no flush', () => {
+    const logger = { error: vi.fn() };
+    const { json, call } = run(valid, { logger });
+
+    expect(call).not.toThrow();
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('honors custom limits', () => {
+    const { logger, call } = run(
+      { ...valid, message: 'abcdefgh', context: { k: 'vvvv' } },
+      { limits: { message: 3, context: 5 } },
+    );
+    call();
+
+    const meta = logged(logger);
+    expect(meta.message).toBe('abc');
+    expect(meta.context).toBe('[context omitted]');
   });
 });

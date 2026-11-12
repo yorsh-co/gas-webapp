@@ -13,6 +13,7 @@ export interface GasWebAppGlobals {
   createAuthMiddleware: unknown;
   createConcurrencyLimiter: unknown;
   createIdempotencyGuard: unknown;
+  createClientErrorHandler: unknown;
   createLoggingMiddleware: unknown;
   createRateLimiter: unknown;
 }
@@ -99,6 +100,7 @@ const load = createGasLoader<GasWebAppGlobals>({
     'createAuthMiddleware',
     'createConcurrencyLimiter',
     'createIdempotencyGuard',
+    'createClientErrorHandler',
     'createLoggingMiddleware',
     'createRateLimiter',
   ],
