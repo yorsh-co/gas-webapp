@@ -105,7 +105,8 @@
             "**/types/*.js",
             "gas-webapp.client.d.ts",
             "gas-webapp.config.d.ts",
-            "gas-webapp.errors.d.ts"
+            "gas-webapp.errors.d.ts",
+            "gas-webapp.reporter.d.ts"
           ],
           "include": [
             {

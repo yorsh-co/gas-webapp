@@ -132,6 +132,28 @@ interface GasWebAppErrors {
   clientError(err: unknown): IServerError;
 }
 
+/** Options for `GasWebApp.reporter.install()`. */
+interface GasWebAppReporterOptions {
+  /** Route the backend mounts `createClientErrorHandler` on. */
+  route: string;
+  /** Also forward uncaught `error` and `unhandledrejection` events. @default false */
+  captureGlobal?: boolean;
+  /** Reports sent per page load; further errors are dropped. @default 10 */
+  maxReports?: number;
+  /** Window in which an identical `kind|scope|message` is sent once. @default 60000 */
+  dedupeMs?: number;
+}
+
+/** Optional reporter, present only when `gas-webapp.reporter` is loaded. */
+interface GasWebAppReporter {
+  /**
+   * Wraps the current logger so `error` calls are also posted to `route`. Call
+   * after `configure({ logger })`; a later `configure({ logger })` replaces the
+   * wrapper. A second call is a no-op.
+   */
+  install(options: GasWebAppReporterOptions): void;
+}
+
 interface GasWebAppNamespace {
   configure(options: GasWebAppOptions): void;
   /** @internal Resolved logger. Assign through `configure()`. */
@@ -140,6 +162,8 @@ interface GasWebAppNamespace {
   config: GasWebAppClientConfig;
   api: GasWebAppApi;
   errors: GasWebAppErrors;
+  /** Present only when `gas-webapp.reporter` is loaded. */
+  reporter?: GasWebAppReporter;
 }
 
 /** Minimal `google.script.run` surface used by the client. */
