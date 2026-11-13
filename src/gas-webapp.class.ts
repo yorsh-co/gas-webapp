@@ -171,7 +171,8 @@ class GasWebApp extends GasWebAppRouter {
    * A real web app request carries `contextPath`; `google.script.run` calls
    * do not. A `google.script.run` caller controls the whole event, so this is
    * advisory: it selects the output format and refuses `render`/`redirect`
-   * over RPC, and must never drive a security decision.
+   * over RPC, and must never grant access. The one exception is the CSRF gate
+   * in `_isCrossSiteSendable`, which only refuses requests on the HTTP side.
    */
   private _isHttpRequest(
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
@@ -217,6 +218,8 @@ class GasWebApp extends GasWebAppRouter {
   }
 
   /**
+   * @throws {GasForbiddenError} When an HTTP POST carries a body type a
+   * cross-site page can send without a CORS preflight.
    * @throws {GasValidationError} When the body is malformed JSON, or `_method`
    * is not PUT, PATCH or DELETE.
    */
@@ -224,6 +227,14 @@ class GasWebApp extends GasWebAppRouter {
     e: GoogleAppsScript.Events.DoGet | GoogleAppsScript.Events.DoPost,
     entryMethod: 'GET' | 'POST',
   ): GasWebAppRequest {
+    if (
+      entryMethod === 'POST' &&
+      this._isHttpRequest(e) &&
+      this._isCrossSiteSendable((e as GoogleAppsScript.Events.DoPost).postData)
+    ) {
+      throw new GasForbiddenError('Unsupported POST content type');
+    }
+
     const parameter = (e && e.parameter) || {};
     const { route, _method, ...query } = parameter;
     const path = gasWebAppNormalizePath(this._resolveRoute(route, e));
@@ -271,6 +282,30 @@ class GasWebApp extends GasWebAppRouter {
       return method;
     }
     throw new GasValidationError('Invalid _method');
+  }
+
+  /**
+   * CSRF gate for HTTP POSTs. A cross-site page can only produce real HTTP
+   * events, and without a CORS preflight it can only send a form, `text/plain`
+   * or a `ping`, or a body with no type at all. Refusing those types closes
+   * forged POSTs under `USER_ACCESSING`; every other type needs a preflight
+   * the web app never grants. `google.script.run` events carry no
+   * `contextPath`, so they skip this gate; forging one requires script on the
+   * app's own origin.
+   */
+  private _isCrossSiteSendable(
+    postData: GoogleAppsScript.Events.DoPost['postData'] | undefined,
+  ): boolean {
+    const type = (postData?.type || '').split(';')[0]?.trim().toLowerCase();
+
+    return (
+      !type ||
+      type === 'application/x-www-form-urlencoded' ||
+      type === 'multipart/form-data' ||
+      type === 'text/plain' ||
+      type === 'text/ping' ||
+      type === 'application/octet-stream'
+    );
   }
 
   /**

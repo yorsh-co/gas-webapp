@@ -127,13 +127,34 @@ test('HTTP request body is parsed by content type', () => {
     'JSON with parameters should be parsed',
   );
   assert(
-    body('a=1', 'application/x-www-form-urlencoded') === undefined,
-    'form bodies should be left to e.parameter',
-  );
-  assert(
-    body('plain', 'text/plain') === 'plain',
+    body('<a/>', 'application/xml') === '<a/>',
     'other types should stay raw strings',
   );
+});
+
+test('HTTP POSTs a cross-site page can send are refused with a 403', () => {
+  const status = (type: string): unknown =>
+    JSON.parse(
+      (
+        createEchoApp().doPost(
+          postEvent('a=1', type),
+        ) as GoogleAppsScript.Content.TextOutput
+      ).getContent(),
+    ).status;
+
+  for (const type of [
+    'application/x-www-form-urlencoded',
+    'multipart/form-data',
+    'text/plain',
+    '',
+  ]) {
+    assert(status(type) === 403, `${type || '(none)'} should be refused`);
+  }
+
+  const rpc = createEchoApp().doPost(
+    postEvent('a=1', 'application/x-www-form-urlencoded', false),
+  ) as SuccessPayload;
+  assert(rpc.data !== undefined, 'RPC form bodies should still be dispatched');
 });
 
 test('res.render over RPC is rejected, and over HTTP served as HTML', () => {

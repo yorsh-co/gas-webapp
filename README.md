@@ -390,13 +390,19 @@ google.script.run
   .doGet({ parameter: { route: '/api/users' } });
 ```
 
-Apps Script exposes only `doGet` and `doPost`, so PUT, PATCH and DELETE are POSTs carrying `_method=PUT|PATCH|DELETE`, in the query string or the form parameters:
+Apps Script exposes only `doGet` and `doPost`, so PUT, PATCH and DELETE are POSTs carrying `_method=PUT|PATCH|DELETE` in the request parameters:
 
 ```bash
-curl -L -X POST "$URL?route=/api/users/42&_method=DELETE"
+curl -L -H 'Content-Type: application/json' -d '{}' "$URL?route=/api/users/42&_method=DELETE"
 ```
 
 `req.method` reports the effective method. Any other `_method` is a 400, and `_method` is ignored on GET.
+
+### CSRF protection
+
+A web app deployed to run as the user accessing it acts with that user's Google session, so a page on another site could otherwise submit a form to it as the victim. An HTTP `doPost` is therefore refused with a 403 (`FORBIDDEN`) before routing when its body has a type a cross-site page can send without a CORS preflight: `application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`, `text/ping`, `application/octet-stream`, or no type at all (a bodyless POST). Send HTTP POSTs as `application/json` or another type that needs a preflight.
+
+`google.script.run` calls are not affected: they can only come from the app's own pages. This does not cover GET: handlers registered with `get`, `all` or `use` run on cross-site links and must not change state.
 
 > **Note:**
 > That's the raw shape either transport expects. If you'd rather not hand-roll the promise wrapping, retry, and error parsing yourself, the [browser client](https://github.com/yorsh-co/gas-webapp/tree/dist-web) does this for you: `GasWebApp.api.get('/api/users')`.
@@ -470,19 +476,19 @@ Routers are mounted by reference, so routes added to `api` later are live, and r
 
 `req` is one object per request, mutated in place, so a field set by middleware reaches everything downstream and the error handlers.
 
-| `req`          | Type                             | Notes                                                                                                                            |
-| -------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `method`       | `'GET' \| 'POST' \| 'PUT' \| …`  | Effective method, after the `_method` override                                                                                   |
-| `path`         | `string`                         | Relative to the current mount, with a leading `/`                                                                                |
-| `originalPath` | `string`                         | The full request path                                                                                                            |
-| `baseUrl`      | `string`                         | Path the current router is mounted on; `''` at the top level                                                                     |
-| `params`       | `Record<string, string>`         | Path parameters of the current layer                                                                                             |
-| `query`        | `Record<string, string>`         | Request parameters, minus `route` and `_method`; the first value of a repeated key (P3)                                          |
-| `body`         | `unknown`                        | Parsed by content type: JSON is parsed, form encodings leave it `undefined` (fields are in `query`), anything else is the string |
-| `id`           | `string`                         | Unique id of the request                                                                                                         |
-| `transport`    | `'http' \| 'rpc'`                | How the request arrived. Advisory, see [Transport](#transport)                                                                   |
-| `raw`          | `Events.DoGet \| Events.DoPost`  | The event Apps Script passed in                                                                                                  |
-| `user`         | `{ email: string } \| undefined` | Set by `createAuthMiddleware`                                                                                                    |
+| `req`          | Type                             | Notes                                                                                                                                                                                        |
+| -------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`       | `'GET' \| 'POST' \| 'PUT' \| …`  | Effective method, after the `_method` override                                                                                                                                               |
+| `path`         | `string`                         | Relative to the current mount, with a leading `/`                                                                                                                                            |
+| `originalPath` | `string`                         | The full request path                                                                                                                                                                        |
+| `baseUrl`      | `string`                         | Path the current router is mounted on; `''` at the top level                                                                                                                                 |
+| `params`       | `Record<string, string>`         | Path parameters of the current layer                                                                                                                                                         |
+| `query`        | `Record<string, string>`         | Request parameters, minus `route` and `_method`; the first value of a repeated key (P3)                                                                                                      |
+| `body`         | `unknown`                        | Parsed by content type: JSON is parsed, form encodings leave it `undefined` (fields are in `query`), anything else is the string. HTTP form and text POSTs are refused (see CSRF protection) |
+| `id`           | `string`                         | Unique id of the request                                                                                                                                                                     |
+| `transport`    | `'http' \| 'rpc'`                | How the request arrived. Advisory, see [Transport](#transport)                                                                                                                               |
+| `raw`          | `Events.DoGet \| Events.DoPost`  | The event Apps Script passed in                                                                                                                                                              |
+| `user`         | `{ email: string } \| undefined` | Set by `createAuthMiddleware`                                                                                                                                                                |
 
 | `res`                     | Notes                                                                                                                |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -739,6 +745,7 @@ A valid report is answered with `202 { received: true }` and logged as `logger.e
 - **Return values are ignored.** A route responds only through `res`.
 - **PUT, PATCH and DELETE are POSTs** with `_method`.
 - **No body parser middleware.** The body is parsed by content type before routing; form fields arrive in `req.query`, and a repeated key keeps its first value (P3).
+- **No HTML form POSTs over HTTP.** Form, `text/plain` and bodyless POSTs are refused with a 403 as a CSRF defense; use JSON or `google.script.run`.
 - **`req.transport` is advisory,** and `req.params` holds only path parameters; `req.query` holds the request parameters.
 - **No view engine.** Views are `HtmlService` templates resolved through the `static` config.
 
