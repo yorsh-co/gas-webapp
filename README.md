@@ -727,7 +727,7 @@ The body must be a plain object with a non-empty string `message` and a `kind` o
 | `userAgent` | `300`   | `userAgent`                                                                      |
 | `context`   | `2000`  | JSON-serialized `context`; over the cap, or unserializable, a marker replaces it |
 
-A valid report is answered with `202 { received: true }` and logged as `logger.error('Client error: <scope>', { kind, message, stack, url, userAgent, clientTimestamp, context, user, reqId })`, where `user` is `req.user` and `reqId` is `req.id`. The handler then calls `logger.flush()` when the logger has one.
+A valid report is answered with `202 { received: true }` and logged as `logger.error('Client error: <scope>', { kind, clientMessage, stack, url, userAgent, clientTimestamp, context, user, reqId })`, where `clientMessage` is the report's `message` (gas-logger reserves `message` and `level` in the entries it builds), `user` is `req.user` and `reqId` is `req.id`. The handler then calls `logger.flush()` when the logger has one.
 
 > **Note:**
 > `gas-chat` suppresses identical alerts for `throttleSeconds` (300 by default), and posting to the webhook needs the `https://www.googleapis.com/auth/script.external_request` scope in `appsscript.json`. `gas-webapp` adds neither; both stay your choice.
