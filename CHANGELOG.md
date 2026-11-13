@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-11-13
+
 ### Added
 
 - `createClientErrorHandler` middleware that receives, sanitizes and logs browser error reports
