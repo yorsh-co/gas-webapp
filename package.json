@@ -1,6 +1,6 @@
 {
   "name": "gas-webapp",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "private": true,
   "description": "Express-style router and middleware for Google Apps Script web apps.",
   "repository": {
@@ -72,7 +72,8 @@
       "middleware/gas-webapp.auth.ts",
       "middleware/gas-webapp.limiter.ts",
       "middleware/gas-webapp.idempotency.ts",
-      "middleware/gas-webapp.logging.ts"
+      "middleware/gas-webapp.logging.ts",
+      "middleware/gas-webapp.client-errors.ts"
     ],
     "peers": {
       "gas-error": "^1.2.0",
@@ -104,7 +105,8 @@
             "**/types/*.js",
             "gas-webapp.client.d.ts",
             "gas-webapp.config.d.ts",
-            "gas-webapp.errors.d.ts"
+            "gas-webapp.errors.d.ts",
+            "gas-webapp.reporter.d.ts"
           ],
           "include": [
             {

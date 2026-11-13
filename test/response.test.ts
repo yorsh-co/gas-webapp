@@ -392,7 +392,10 @@ describe('errorView', () => {
     expect(
       thrownEnvelope(() => app.doGet({ parameter: { route: '/x' } })),
     ).toMatchObject({ status: 500 });
-    const post = app.doPost(http('/x')) as Output;
+    const post = app.doPost({
+      ...http('/x'),
+      postData: { contents: '{}', type: 'application/json' },
+    }) as Output;
     expect(envelopeOf(post)).toMatchObject({ ok: false, status: 500 });
   });
 

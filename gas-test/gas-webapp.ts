@@ -127,13 +127,34 @@ test('HTTP request body is parsed by content type', () => {
     'JSON with parameters should be parsed',
   );
   assert(
-    body('a=1', 'application/x-www-form-urlencoded') === undefined,
-    'form bodies should be left to e.parameter',
-  );
-  assert(
-    body('plain', 'text/plain') === 'plain',
+    body('<a/>', 'application/xml') === '<a/>',
     'other types should stay raw strings',
   );
+});
+
+test('HTTP POSTs a cross-site page can send are refused with a 403', () => {
+  const status = (type: string): unknown =>
+    JSON.parse(
+      (
+        createEchoApp().doPost(
+          postEvent('a=1', type),
+        ) as GoogleAppsScript.Content.TextOutput
+      ).getContent(),
+    ).status;
+
+  for (const type of [
+    'application/x-www-form-urlencoded',
+    'multipart/form-data',
+    'text/plain',
+    '',
+  ]) {
+    assert(status(type) === 403, `${type || '(none)'} should be refused`);
+  }
+
+  const rpc = createEchoApp().doPost(
+    postEvent('a=1', 'application/x-www-form-urlencoded', false),
+  ) as SuccessPayload;
+  assert(rpc.data !== undefined, 'RPC form bodies should still be dispatched');
 });
 
 test('res.render over RPC is rejected, and over HTTP served as HTML', () => {
@@ -443,4 +464,28 @@ info('Session email availability', () => {
   return `active: ${active ? 'available' : 'empty'}, effective: ${
     effective ? 'available' : 'empty'
   }`;
+});
+
+test('the client error handler logs a posted report once and answers 202', () => {
+  const lines: Array<{ message: string; meta: unknown }> = [];
+  const logger = {
+    ...console,
+    error: (message: string, meta: unknown): void => {
+      lines.push({ message, meta });
+    },
+  } as unknown as typeof console;
+  const app = new GasWebApp();
+  app.post('/client-errors', createClientErrorHandler(logger));
+
+  const result = app.doPost({
+    parameter: { route: '/client-errors' },
+    postData: {
+      type: 'application/json',
+      contents: JSON.stringify({ kind: 'logged', scope: 'Cart', message: 'x' }),
+    },
+  } as unknown as GoogleAppsScript.Events.DoPost) as SuccessPayload;
+
+  assert(result.status === 202, `unexpected: ${JSON.stringify(result)}`);
+  assert(lines.length === 1, `expected one log line, got ${lines.length}`);
+  assert(lines[0]?.message === 'Client error: Cart', lines[0]?.message ?? '');
 });
