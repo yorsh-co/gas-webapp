@@ -534,7 +534,7 @@ describe('createClientErrorHandler', () => {
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith('Client error: Cart', {
       kind: 'logged',
-      message: 'boom',
+      clientMessage: 'boom',
       stack: 's',
       url: 'u',
       userAgent: 'ua',
@@ -546,6 +546,21 @@ describe('createClientErrorHandler', () => {
     expect(logger.flush).toHaveBeenCalledOnce();
     expect(res.status).toHaveBeenCalledWith(202);
     expect(json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('keeps the client text when the logger reserves message and level', () => {
+    const entries: Record<string, unknown>[] = [];
+    const logger = {
+      error: (msg: string, meta: Record<string, unknown>) => {
+        entries.push({ ...meta, message: msg, level: 'error' });
+      },
+      flush: vi.fn(),
+    };
+    const { call } = run({ ...valid, message: 'boom' }, { logger });
+    call();
+
+    expect(entries[0]?.clientMessage).toBe('boom');
+    expect(entries[0]?.message).toBe('Client error: Cart');
   });
 
   it('drops unknown keys', () => {
@@ -635,7 +650,7 @@ describe('createClientErrorHandler', () => {
     expect(logger.error.mock.calls[0]?.[0]).toBe(
       `Client error: ${'x'.repeat(100)}`,
     );
-    expect((meta.message as string).length).toBe(1000);
+    expect((meta.clientMessage as string).length).toBe(1000);
     expect((meta.stack as string).length).toBe(4000);
     expect((meta.url as string).length).toBe(500);
     expect((meta.userAgent as string).length).toBe(300);
@@ -693,7 +708,7 @@ describe('createClientErrorHandler', () => {
     );
     call();
 
-    expect(logged(logger).message).toBe('abcdefgh');
+    expect(logged(logger).clientMessage).toBe('abcdefgh');
   });
 
   it('honors custom limits', () => {
@@ -704,7 +719,7 @@ describe('createClientErrorHandler', () => {
     call();
 
     const meta = logged(logger);
-    expect(meta.message).toBe('abc');
+    expect(meta.clientMessage).toBe('abc');
     expect(meta.context).toBe('[context omitted]');
   });
 });

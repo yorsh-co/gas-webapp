@@ -31,6 +31,9 @@ const GAS_WEBAPP_CLIENT_ERROR_CONTEXT_OMITTED = '[context omitted]';
  * gets a 500 and the reporter does not retry). Sheet formula injection is escaped by
  * gas-logger itself.
  *
+ * The client text is logged as `clientMessage`, because gas-logger reserves
+ * `message` and `level` in the entries it builds.
+ *
  * The handler keeps no throttling state; mount it behind a rate limiter. To
  * raise a Google Chat alert, pass a logger decorated with gas-chat's
  * `chat.logger(...)`. Usage:
@@ -105,7 +108,7 @@ const createClientErrorHandler = (
 
     logger.error(`Client error: ${scope}`, {
       kind: report.kind,
-      message,
+      clientMessage: message,
       stack: text(report.stack, limits.stack),
       url: text(report.url, limits.url),
       userAgent: text(report.userAgent, limits.userAgent),
