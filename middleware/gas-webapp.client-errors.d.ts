@@ -2,7 +2,7 @@ declare const GAS_WEBAPP_CLIENT_ERROR_KINDS: readonly GasWebAppClientErrorKind[]
 declare const GAS_WEBAPP_CLIENT_ERROR_LIMITS: Required<GasWebAppClientErrorLimits>;
 declare const GAS_WEBAPP_CLIENT_ERROR_TIMESTAMP_MAX = 100;
 declare const GAS_WEBAPP_CLIENT_ERROR_DEFAULT_SCOPE = 'Client';
-declare const CONTROL_CHARS: RegExp;
+declare const GAS_WEBAPP_CONTROL_CHARS: RegExp;
 declare const GAS_WEBAPP_CLIENT_ERROR_CONTEXT_OMITTED = '[context omitted]';
 /**
  * Client error report handler factory.

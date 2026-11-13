@@ -14,7 +14,7 @@ const GAS_WEBAPP_CLIENT_ERROR_LIMITS = {
 };
 const GAS_WEBAPP_CLIENT_ERROR_TIMESTAMP_MAX = 100;
 const GAS_WEBAPP_CLIENT_ERROR_DEFAULT_SCOPE = 'Client';
-const CONTROL_CHARS =
+const GAS_WEBAPP_CONTROL_CHARS =
   // eslint-disable-next-line no-control-regex
   /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 const GAS_WEBAPP_CLIENT_ERROR_CONTEXT_OMITTED = '[context omitted]';
@@ -84,7 +84,7 @@ const createClientErrorHandler = (logger = console, config = {}) => {
     const scope =
       text(
         typeof report.scope === 'string'
-          ? report.scope.replace(CONTROL_CHARS, ' ')
+          ? report.scope.replace(GAS_WEBAPP_CONTROL_CHARS, ' ')
           : undefined,
         limits.scope,
       )?.trim() || GAS_WEBAPP_CLIENT_ERROR_DEFAULT_SCOPE;
