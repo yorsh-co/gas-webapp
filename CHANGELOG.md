@@ -2,7 +2,11 @@
 
 ---
 
-## [Unreleased]
+## [1.1.2] - 2026-11-13
+
+### Fixed
+
+- Updated version declaration in peer types.
 
 ---
 
