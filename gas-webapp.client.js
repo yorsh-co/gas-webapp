@@ -156,12 +156,14 @@ window.GasWebApp.api = window.GasWebApp.api || {};
       const runner = window.google?.script?.run;
       if (!runner) {
         reject(
-          new window.GasWebApp.errors.ServerError({
-            ok: false,
-            error: 'google.script.run is not available',
-            status: 500,
-            code: 'INTERNAL_ERROR',
-          }),
+          new window.GasWebApp.errors.ServerError(
+            window.GasWebApp.errors._markClientMinted({
+              ok: false,
+              error: 'google.script.run is not available',
+              status: 500,
+              code: 'INTERNAL_ERROR',
+            }),
+          ),
         );
         return;
       }

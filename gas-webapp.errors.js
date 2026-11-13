@@ -16,15 +16,31 @@ window.GasWebApp = window.GasWebApp || {};
   'use strict';
   const CLIENT_TIMEOUT_CODE = 'CLIENT_TIMEOUT';
   const NOT_DELIVERED_CODE = 'NOT_DELIVERED';
+  const CLIENT_MINTED = Symbol.for('gas-webapp.clientMinted');
+  /**
+   * Tags a payload built on the client so the reporter can tell it never went
+   * through the server logger. Non-enumerable: invisible to JSON and spreads.
+   */
+  function markClientMinted(payload) {
+    Object.defineProperty(payload, CLIENT_MINTED, { value: true });
+    return payload;
+  }
+  function isClientMinted(payload) {
+    return (
+      typeof payload === 'object' &&
+      payload !== null &&
+      payload[CLIENT_MINTED] === true
+    );
+  }
   /** Fallback for anything that isn't a recoverable server payload. */
   function defaultErrorPayload(message) {
-    return {
+    return markClientMinted({
       ok: false,
       error: 'Unexpected error',
       status: 500,
       code: 'INTERNAL_ERROR',
       details: message,
-    };
+    });
   }
   /**
    * Extract the `GasErrorPayload` from an error thrown across
@@ -119,5 +135,7 @@ window.GasWebApp = window.GasWebApp || {};
     timeoutError,
     notDeliveredError,
     clientError,
+    _markClientMinted: markClientMinted,
+    _isClientMinted: isClientMinted,
   };
 })();
