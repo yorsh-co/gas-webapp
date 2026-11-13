@@ -6,6 +6,14 @@
 
 ---
 
+## [1.1.1] - 2026-11-13
+
+### Fixed
+
+- Added missing `GAS_WEBAPP_` library prefix to global `CONTROL_CHARS` constant to avoid conflicts in consumer repos.
+
+---
+
 ## [1.1.0] - 2026-11-13
 
 ### Added
