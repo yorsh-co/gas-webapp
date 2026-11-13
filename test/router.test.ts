@@ -199,6 +199,43 @@ describe('path matching (X3)', () => {
     expect(call(app, '')).toBe('ok');
   });
 
+  it.each([
+    [
+      '/files/:name.:ext',
+      '/files/archive.tar.gz',
+      { name: 'archive.tar', ext: 'gz' },
+    ],
+    ['/files/:name.:ext', '/files/a.b.', { name: 'a', ext: 'b.' }],
+    ['/range/:from-:to', '/range/1-2-', { from: '1', to: '2-' }],
+    ['/:a.:b.:c', '/1.2.3.', { a: '1', b: '2', c: '3.' }],
+    ['/:a{-:b}-:c', '/x-y-z-', { a: 'x-y', c: 'z-' }],
+    ['/:a-*rest', '/x-y-', { a: 'x', rest: 'y-' }],
+    ['/*a-*b', '/x-y-', { a: 'x', b: 'y-' }],
+    ['/*a/:b.*c', '/p/q.r/s', { a: 'p', b: 'q', c: 'r/s' }],
+    ['/:a:b', '/abc', { a: 'ab', b: 'c' }],
+    ['/:a*b', '/ab', { a: 'a', b: 'b' }],
+    ['/*a:b', '/ab', { a: 'a', b: 'b' }],
+    ['/:a{:b}', '/ab', { a: 'ab' }],
+    ['/{:a}{:b}', '/ab', { a: 'ab' }],
+  ])(
+    'matches %s against %s greedily, left to right',
+    (pattern, route, expected) => {
+      expect(params(pattern, route)).toEqual(expected);
+    },
+  );
+
+  it.each([
+    ['/files/:name.:ext', `/files/${'.'.repeat(100_000)}/x`],
+    ['/:a-:b-:c', `/${'-'.repeat(5_000)}/x`],
+  ])('rejects a crafted path for %s in linear time', (pattern, route) => {
+    const { app } = setup();
+    app.get(pattern, reply);
+
+    const started = Date.now();
+    expect(fail(app, route)).toMatchObject({ status: 404 });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it.each(['/a(b)', '/a?', '/a+', '/a[b]', '/:', '/*', '/a{b'])(
     'rejects the unsupported pattern %s at registration',
     (pattern) => {
