@@ -2,6 +2,18 @@
 
 ---
 
+## [1.1.3] - 2026-11-13
+
+### Fixed
+
+- `createClientErrorHandler` logs the client's error text as `clientMessage`; it was logged as `message`, which gas-logger overwrote with the log line's message in the console and execution log.
+
+### Changed
+
+- Dev-only: migrated to gasdev 3.1.0, whose `gasdev check` verifies the peer `@version` header.
+
+---
+
 ## [1.1.2] - 2026-11-13
 
 ### Fixed
