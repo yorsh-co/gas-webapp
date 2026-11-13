@@ -10,6 +10,10 @@
 - Optional `gas-webapp.reporter` web file and `GasWebApp.reporter.install()` to forward `logger.error` calls and uncaught errors to that route; `reporter` is now a reserved `GasWebApp` namespace key
 - ADR 0001 recording the client error reporting design
 
+### Fixed
+
+- Path matching runs in time linear in the request path length: a pattern with several parameters in one segment (`/:name.:ext`, `/:a-:b-:c`) no longer backtracks polynomially on a crafted path (CWE-1333). Which paths match, and the parameters captured, are unchanged
+
 ---
 
 ## [1.0.5] - 2026-11-12
