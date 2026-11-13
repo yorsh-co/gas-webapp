@@ -10,6 +10,10 @@
 - Optional `gas-webapp.reporter` web file and `GasWebApp.reporter.install()` to forward `logger.error` calls and uncaught errors to that route; `reporter` is now a reserved `GasWebApp` namespace key
 - ADR 0001 recording the client error reporting design
 
+### Security
+
+- HTTP `doPost` requests whose body type a cross-site page can send without a CORS preflight (form-urlencoded, multipart, `text/plain`, `text/ping`, `application/octet-stream`, or no type) are refused with a 403 before routing, closing CSRF against apps that run as the accessing user. HTML form POSTs to the web app URL no longer reach handlers; send JSON or use `google.script.run`, which is unaffected
+
 ---
 
 ## [1.0.5] - 2026-11-12

@@ -94,7 +94,9 @@ describe('body parsing by content type (L2)', () => {
   it.each(['application/x-www-form-urlencoded', 'multipart/form-data'])(
     'leaves %s to e.parameter',
     (type) => {
-      expect(body({ contents: 'a=1&b=2', type })).toEqual({
+      const { app } = setup();
+
+      expect(app.doPost(rpcPost({ contents: 'a=1&b=2', type }))).toEqual({
         ok: true,
         status: 200,
         data: {},
@@ -103,10 +105,77 @@ describe('body parsing by content type (L2)', () => {
   );
 
   it('keeps any other type as the raw string', () => {
-    expect(body({ contents: 'plain text', type: 'text/plain' })).toMatchObject({
+    expect(body({ contents: '<a/>', type: 'application/xml' })).toMatchObject({
       ok: true,
-      data: { body: 'plain text' },
+      data: { body: '<a/>' },
     });
+  });
+});
+
+describe('HTTP POST CSRF gate', () => {
+  const status = (postData?: object): unknown => {
+    const { app } = setup();
+    const event = postData
+      ? httpPost(postData)
+      : { parameter: { route: 'echo' }, contextPath: '' };
+    const output = app.doPost(event) as Output;
+    return JSON.parse(output.getContent());
+  };
+
+  it.each([
+    'application/x-www-form-urlencoded',
+    'multipart/form-data; boundary=x',
+    'text/plain',
+    'TEXT/PLAIN; charset=utf-8',
+    'text/ping',
+    'application/octet-stream',
+    '',
+  ])('refuses %j with a 403 before any handler runs', (type) => {
+    expect(status({ contents: 'a=1', type })).toMatchObject({
+      ok: false,
+      status: 403,
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('refuses a bodyless HTTP POST', () => {
+    expect(status()).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it('refuses a form POST carrying a _method override', () => {
+    const { app } = setup();
+    app.delete('echo', (_req: TestRequest, res: TestResponse) =>
+      res.json('deleted'),
+    );
+
+    const output = app.doPost(
+      httpPost(
+        {
+          contents: '_method=DELETE',
+          type: 'application/x-www-form-urlencoded',
+        },
+        { route: 'echo', _method: 'DELETE' },
+      ),
+    ) as Output;
+
+    expect(JSON.parse(output.getContent())).toMatchObject({ status: 403 });
+  });
+
+  it.each([
+    'application/json',
+    'application/xml',
+    'application/merge-patch+json',
+    'text/csv',
+  ])('dispatches %s', (type) => {
+    expect(status({ contents: '1', type })).toMatchObject({ ok: true });
+  });
+
+  it('leaves google.script.run calls untouched', () => {
+    const { app } = setup();
+
+    expect(
+      app.doPost(rpcPost({ contents: 'plain text', type: 'text/plain' })),
+    ).toMatchObject({ ok: true, data: { body: 'plain text' } });
   });
 });
 

@@ -894,6 +894,7 @@ describe('method override (X6)', () => {
     const output = app.doPost({
       parameter: { route: '/x', _method: 'PUT' },
       contextPath: '',
+      postData: { contents: '{}', type: 'application/json' },
     }) as { getContent(): string };
 
     expect(JSON.parse(output.getContent()).data).toBe('put');
@@ -905,6 +906,7 @@ describe('method override (X6)', () => {
     const output = app.doPost({
       parameter: { route: '/x', _method: 'x' },
       contextPath: '',
+      postData: { contents: '{}', type: 'application/json' },
     }) as { getContent(): string };
 
     expect(JSON.parse(output.getContent())).toMatchObject({ status: 400 });
