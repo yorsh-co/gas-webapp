@@ -2,7 +2,19 @@
 
 ---
 
-## [Unreleased]
+## [1.1.2] - 2026-11-13
+
+### Fixed
+
+- Updated version declaration in peer types.
+
+---
+
+## [1.1.1] - 2026-11-13
+
+### Fixed
+
+- Added missing `GAS_WEBAPP_` library prefix to global `CONTROL_CHARS` constant to avoid conflicts in consumer repos.
 
 ---
 
