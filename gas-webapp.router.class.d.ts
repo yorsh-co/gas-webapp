@@ -17,6 +17,30 @@ interface GasWebAppLayer {
   isRoute: boolean;
   fns: (GasWebAppHandler | GasWebAppErrorHandler | GasWebAppRouter)[];
 }
+/** One instruction of a compiled path pattern. */
+type GasWebAppPathOp =
+  /** Literal text, compared case-insensitively by a sticky regexp. */
+  | {
+      type: 'text';
+      regexp: RegExp;
+      length: number;
+    }
+  /** One character of `:name` (any but `/`) or `*name` (any but a line terminator). */
+  | {
+      type: 'char';
+      wildcard: boolean;
+    }
+  /** Tries `first`, then `second`. */
+  | {
+      type: 'split';
+      first: number;
+      second: number;
+    }
+  /** Records the current position in a capture slot. */
+  | {
+      type: 'save';
+      slot: number;
+    };
 declare const GAS_WEBAPP_PARAM_NAME: RegExp;
 declare const GAS_WEBAPP_RESERVED_PATH_CHARS = '()[]?+!';
 /** Normalises a request path: leading `/`, no repeated or trailing slashes. */
@@ -27,6 +51,12 @@ declare const gasWebAppNormalizePath: (path: string) => string;
  * of the path including slashes, and `{...}` is optional. A trailing slash is
  * optional. With `end: false` the pattern matches a prefix, on segment
  * boundaries.
+ *
+ * Matching has the semantics of the regexp `^…/?$` (or `^…(?=/|$)` for a
+ * prefix) with `:name` as `([^/]+)`, `*name` as `(.+)` and `{…}` as `(?:…)?`,
+ * and explores alternatives in the same order. Each (instruction, position)
+ * pair is tried at most once, since a pair that failed fails again, so the
+ * time is linear in the path length however many parameters share a segment.
  *
  * @throws {TypeError} When the pattern is malformed or uses unsupported syntax.
  */

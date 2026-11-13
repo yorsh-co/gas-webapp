@@ -11,12 +11,29 @@ const gasWebAppNormalizePath = (path) =>
  * optional. With `end: false` the pattern matches a prefix, on segment
  * boundaries.
  *
+ * Matching has the semantics of the regexp `^…/?$` (or `^…(?=/|$)` for a
+ * prefix) with `:name` as `([^/]+)`, `*name` as `(.+)` and `{…}` as `(?:…)?`,
+ * and explores alternatives in the same order. Each (instruction, position)
+ * pair is tried at most once, since a pair that failed fails again, so the
+ * time is linear in the path length however many parameters share a segment.
+ *
  * @throws {TypeError} When the pattern is malformed or uses unsupported syntax.
  */
 const gasWebAppCompilePath = (pattern, end) => {
   const source = gasWebAppNormalizePath(pattern);
   const names = [];
+  const ops = [];
+  let text = '';
   let index = 0;
+  const flushText = () => {
+    if (!text) return;
+    ops.push({
+      type: 'text',
+      regexp: new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iy'),
+      length: text.length,
+    });
+    text = '';
+  };
   const readName = () => {
     const name = GAS_WEBAPP_PARAM_NAME.exec(source.slice(index + 1))?.[0];
     if (!name) {
@@ -26,67 +43,138 @@ const gasWebAppCompilePath = (pattern, end) => {
     return name;
   };
   const parse = (inGroup) => {
-    let out = '';
     while (index < source.length) {
       const char = source[index];
       if (char === '}') {
         if (!inGroup) {
           throw new TypeError(`Unexpected "}" at ${index} in "${pattern}"`);
         }
-        return out;
+        return;
       }
       if (char === '{') {
+        flushText();
+        const split = {
+          type: 'split',
+          first: ops.length + 1,
+          second: 0,
+        };
+        ops.push(split);
         index += 1;
-        out += `(?:${parse(true)})?`;
+        parse(true);
         if (source[index] !== '}') {
           throw new TypeError(`Unterminated "{" in "${pattern}"`);
         }
         index += 1;
-      } else if (char === ':') {
-        names.push(readName());
-        out += '([^/]+)';
-      } else if (char === '*') {
-        names.push(readName());
-        out += '(.+)';
+        flushText();
+        split.second = ops.length;
+      } else if (char === ':' || char === '*') {
+        flushText();
+        const slot = names.push(readName()) * 2 - 2;
+        const loop = ops.length + 1;
+        ops.push(
+          { type: 'save', slot },
+          { type: 'char', wildcard: char === '*' },
+          { type: 'split', first: loop, second: loop + 2 },
+          { type: 'save', slot: slot + 1 },
+        );
       } else if (GAS_WEBAPP_RESERVED_PATH_CHARS.includes(char)) {
         throw new TypeError(
           `Unsupported "${char}" at ${index} in "${pattern}"`,
         );
       } else {
-        out += (char === '\\' ? (source[++index] ?? '') : char).replace(
-          /[.*+?^${}()|[\]\\]/g,
-          '\\$&',
-        );
+        text += char === '\\' ? (source[++index] ?? '') : char;
         index += 1;
       }
     }
     if (inGroup) throw new TypeError(`Unterminated "{" in "${pattern}"`);
-    return out;
   };
-  const body = parse(false);
-  const regexp = new RegExp(
+  parse(false);
+  // The root pattern compiles to no instructions, so `/` itself is optional.
+  if (ops.length === 0 && text === '/') text = '';
+  flushText();
+  /** Whether the pattern may end at `at`: the whole path or a segment boundary. */
+  const accepts = (path, at) =>
     end
-      ? `^${body === '/' ? '' : body}/?$`
-      : `^${body === '/' ? '' : body}(?=/|$)`,
-    'i',
-  );
+      ? at === path.length || (at === path.length - 1 && path[at] === '/')
+      : at === path.length || path[at] === '/';
+  /**
+   * Runs the instructions depth-first, preferred alternative first, and
+   * returns the match length with the captures left in `slots`, or -1.
+   */
+  const run = (path, slots) => {
+    const width = ops.length + 1;
+    const visited = new Uint32Array(
+      Math.ceil((width * (path.length + 1)) / 32),
+    );
+    // (instruction, position) pairs to resume from, most preferred last. A
+    // negative instruction `-n - 1` restores slot n to the position instead.
+    const stack = [0, 0];
+    while (stack.length > 0) {
+      let at = stack.pop();
+      let pc = stack.pop();
+      if (pc < 0) {
+        slots[-pc - 1] = at;
+        continue;
+      }
+      for (;;) {
+        const state = at * width + pc;
+        const word = Math.floor(state / 32);
+        const bit = 1 << (state % 32);
+        if (visited[word] & bit) break;
+        visited[word] = visited[word] | bit;
+        const op = ops[pc];
+        if (!op) {
+          if (accepts(path, at)) return end ? path.length : at;
+          break;
+        }
+        if (op.type === 'text') {
+          op.regexp.lastIndex = at;
+          if (!op.regexp.test(path)) break;
+          at += op.length;
+          pc += 1;
+        } else if (op.type === 'char') {
+          const code = path.charCodeAt(at);
+          const allowed = op.wildcard
+            ? code !== 0x0a &&
+              code !== 0x0d &&
+              code !== 0x2028 &&
+              code !== 0x2029
+            : code !== 0x2f;
+          if (at >= path.length || !allowed) break;
+          at += 1;
+          pc += 1;
+        } else if (op.type === 'split') {
+          stack.push(op.second, at);
+          pc = op.first;
+        } else {
+          stack.push(-op.slot - 1, slots[op.slot]);
+          slots[op.slot] = at;
+          pc += 1;
+        }
+      }
+    }
+    return -1;
+  };
   return {
     match(path) {
-      const result = regexp.exec(path);
-      if (!result) return null;
+      const slots = names.flatMap(() => [-1, -1]);
+      const length = run(path, slots);
+      if (length < 0) return null;
       const params = {};
       names.forEach((name, i) => {
-        const value = result[i + 1];
-        if (value === undefined) return;
+        const start = slots[2 * i];
+        if (start < 0) return;
         try {
-          params[name] = decodeURIComponent(value);
+          params[name] = decodeURIComponent(
+            path.slice(start, slots[2 * i + 1]),
+          );
         } catch {
           throw new GasValidationError(
             `Invalid encoding in parameter "${name}"`,
           );
         }
       });
-      return { params, length: result[0].length };
+      return { params, length };
     },
   };
 };

@@ -1,6 +1,6 @@
 {
   "name": "gas-webapp",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Express-style router and middleware for Google Apps Script web apps.",
   "license": "MIT",
   "author": "Joshua Porter",
@@ -18,7 +18,8 @@
       "middleware/gas-webapp.auth.js",
       "middleware/gas-webapp.limiter.js",
       "middleware/gas-webapp.idempotency.js",
-      "middleware/gas-webapp.logging.js"
+      "middleware/gas-webapp.logging.js",
+      "middleware/gas-webapp.client-errors.js"
     ],
     "peers": {
       "gas-error": "^1.2.0",

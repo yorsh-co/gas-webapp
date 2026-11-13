@@ -67,7 +67,8 @@ declare class GasWebApp extends GasWebAppRouter {
    * A real web app request carries `contextPath`; `google.script.run` calls
    * do not. A `google.script.run` caller controls the whole event, so this is
    * advisory: it selects the output format and refuses `render`/`redirect`
-   * over RPC, and must never drive a security decision.
+   * over RPC, and must never grant access. The one exception is the CSRF gate
+   * in `_isCrossSiteSendable`, which only refuses requests on the HTTP side.
    */
   private _isHttpRequest;
   private _transportOf;
@@ -78,6 +79,8 @@ declare class GasWebApp extends GasWebAppRouter {
    */
   private _resolveError;
   /**
+   * @throws {GasForbiddenError} When an HTTP POST carries a body type a
+   * cross-site page can send without a CORS preflight.
    * @throws {GasValidationError} When the body is malformed JSON, or `_method`
    * is not PUT, PATCH or DELETE.
    */
@@ -92,6 +95,16 @@ declare class GasWebApp extends GasWebAppRouter {
    * (any case) is dispatched as that method. `_method` is ignored on GET.
    */
   private _resolveMethod;
+  /**
+   * CSRF gate for HTTP POSTs. A cross-site page can only produce real HTTP
+   * events, and without a CORS preflight it can only send a form, `text/plain`
+   * or a `ping`, or a body with no type at all. Refusing those types closes
+   * forged POSTs under `USER_ACCESSING`; every other type needs a preflight
+   * the web app never grants. `google.script.run` events carry no
+   * `contextPath`, so they skip this gate; forging one requires script on the
+   * app's own origin.
+   */
+  private _isCrossSiteSendable;
   /**
    * Parse a POST body by its content type: JSON is parsed, form encodings are
    * left to `e.parameter`, anything else is kept as the raw string.
