@@ -22,7 +22,7 @@
  * `gasdev peers sync`, which writes it to `src/internal/`.
  *
  * @see https://github.com/yorsh-co/gas-webapp
- * @version 1.0.5
+ * @version 1.1.0
  */
 
 // =========================
@@ -330,6 +330,28 @@ interface GasWebAppIdempotencyConfig {
   lockScope?: LockScope;
 }
 
+/** Maximum lengths, in characters, applied to a client error report. */
+interface GasWebAppClientErrorLimits {
+  /** @default 1000 */
+  message?: number;
+  /** @default 4000 */
+  stack?: number;
+  /** @default 100 */
+  scope?: number;
+  /** @default 500 */
+  url?: number;
+  /** @default 300 */
+  userAgent?: number;
+  /** Cap on the JSON-serialized `context`; over it, a marker replaces it. @default 2000 */
+  context?: number;
+}
+
+/** Options for `createClientErrorHandler`. */
+interface GasWebAppClientErrorConfig {
+  /** Overrides for the field caps; unset fields keep their defaults. */
+  limits?: GasWebAppClientErrorLimits;
+}
+
 /** Identifies the signed-in user and sets `req.user`. Throws `GasUnauthorizedError`. */
 declare const createAuthMiddleware: (
   config: AuthMiddlewareConfig,
@@ -357,4 +379,10 @@ declare const createAckTracker: (
 /** Replays the stored response for a repeated idempotency key. */
 declare const createIdempotencyGuard: (
   config?: GasWebAppIdempotencyConfig,
+) => GasWebAppHandler;
+
+/** Receives, sanitizes and logs browser error reports from the reporter. */
+declare const createClientErrorHandler: (
+  logger?: GasLogger | typeof console,
+  config?: GasWebAppClientErrorConfig,
 ) => GasWebAppHandler;

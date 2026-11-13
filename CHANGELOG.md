@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-11-13
+
 ### Added
 
 - `createClientErrorHandler` middleware that receives, sanitizes and logs browser error reports
@@ -12,6 +16,7 @@
 
 ### Fixed
 
+- Peer declarations now declare `createClientErrorHandler`, `GasWebAppClientErrorConfig` and `GasWebAppClientErrorLimits`
 - Path matching runs in time linear in the request path length: a pattern with several parameters in one segment (`/:name.:ext`, `/:a-:b-:c`) no longer backtracks polynomially on a crafted path (CWE-1333). Which paths match, and the parameters captured, are unchanged
 
 ### Security
